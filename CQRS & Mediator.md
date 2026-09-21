@@ -107,7 +107,7 @@ Bu nedenlerden ötürü karmaşık ve büyük ölçekli sistemlerde okuma ve yaz
     
     Örneğin yoğun okuma trafiğine sahip bir sistemde yapı şu şekilde olabilir:
 
-    [![Read Replica Mimari Şeması](./Images/Read-replica-pattern.png)](https://bytebytego.com/guides/read-replica-pattern/)
+    [![Read Replica Mimari Şeması](/Images/Read-replica-pattern.png)](https://bytebytego.com/guides/read-replica-pattern/)
     *Görsel Kaynağı: [ByteByteGo - Read Replica Pattern](https://bytebytego.com/guides/read-replica-pattern/)*
   
     Ana veritabanında gerçekleştirilen **INSERT, UPDATE veya DELETE** gibi değişiklikler replikalara da aktarılır. Ancak bu aktarım her zaman tamamen eş zamanlı gerçekleşmeyebilir. Ana veritabanındaki değişikliğin replikalara ulaşmasında kısa bir gecikme oluşabilir.
@@ -146,7 +146,7 @@ Bu nedenlerden ötürü karmaşık ve büyük ölçekli sistemlerde okuma ve yaz
 ---
 
 # Mediator
-![Mediator Design Pattern - Kaotik vs Merkezi Yönetim](C:/Users/HP/PycharmProjects/Python_Project/TUG/Images/Mediator.jpg)
+![Mediator Design Pattern - Kaotik vs Merkezi Yönetim](/Images/Mediator.jpg)
 
 Mediator, çok sayıda nesnenin bulunduğu sistemlerde nesnelerin birbirleriyle doğrudan iletişim kurmasını azaltmak ve aralarındaki bağımlılığı en aza indirmek amacıyla kullanılan bir davranışsal (Behavioral) tasarım desenidir.
 
