@@ -161,8 +161,7 @@ Mediator kullanıldığında ise nesneler, iletişim kurmak istedikleri diğer n
 Örneğin normal bir yapıda A sınıfı B ile, B sınıfı C ile ve C sınıfı D ile doğrudan iletişim kurabilir. Nesne sayısı arttıkça bu ilişkiler daha karmaşık hale gelebilir.
 
 Mediator kullanıldığında ise:
-![Direct Communication vs Mediator Pattern](Images/Direct Communication vs Mediator Pattern.png)
-
+![Direct Communication vs Mediator Pattern](Images/Direct%20Communication%20vs%20Mediator%20Pattern.png)
 
 Nesneler iletişim kurmak istediklerinde doğrudan birbirlerine başvurmak yerine Mediator'a başvurur. Mediator ise gelen iletişimi ilgili nesneye yönlendirir.
 
