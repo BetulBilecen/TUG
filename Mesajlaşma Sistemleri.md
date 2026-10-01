@@ -302,6 +302,7 @@ Yani `order.*` yazdığımızda order ile başlayıp arkasında yalnızca tek bi
 Mesajların ilgili Queue'ya gitmesi için gereken yönlendirmeyi routing key ile değil, mesajın header bilgisine göre yapar.
 
 ![Headers Exchange](https://www.rahulpnath.com/content/images/2024/04/image-2.png)
+
 <small>*Görsel Kaynağı: [Rahul P Nath — RabbitMQ Headers Exchange](https://www.rahulpnath.com/blog/headers-exchange-rabbitmq-dotnet)*</small>
 
 #### ACK ve Mesaj İşleme
@@ -402,6 +403,7 @@ Partition 1 -> ürün bilgilerini tutan queue
 Apache Kafka'da mesajların sırası Partition içerisinde garanti edilir. Yani Partition 0 veya 1 arasındaki sıra, mesaj iletirken önemli değildir; önemli olan Partition içerisindeki hücrelerde bulunan mesajların sırasıdır.
 
 ![Topic & Partition](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQEVdAcuWcrSD8Gvl250gr4Y4eSY9vFn6vUnGdnluvdYg&s=10)
+
 <small>*Görsel Kaynağı: [Siva Yuvi — Kafka Partition (Hashnode)](https://sivayuvi79.hashnode.dev/kafka-partition)*</small>
 
 #### Offset
@@ -489,6 +491,7 @@ Kafka Cluster
 ```
 
 ![Broker](Images/Kafka_Internals_046.png)
+
 <small>*Kaynak: [Confluent Developer — Apache Kafka Architecture: Data Replication](https://developer.confluent.io/courses/architecture/data-replication/)*</small>
 
 #### Replication
@@ -508,6 +511,7 @@ Bir Partition'ın replica'ları arasında bir tanesi Leader olarak görev yapar.
 Yahoo tarafından geliştirilmiş, daha sonra Apache çatısı altına alınmış açık kaynaklı bir Message Broker yazılımıdır. Apache Pulsar, Broker ve BookKeeper/Bookie olmak üzere iki katmandan oluşur. Broker, sunucu katmanı olarak mesajların alınmasından ve iletilmesinden sorumluyken, BookKeeper depolama katmanı olarak mesajların kalıcı olarak saklanmasından sorumludur. BookKeeper içerisindeki depolama sunucularına Bookie adı verilir.
 
 ![Apache Pulsar](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRHRpZos_3nx37iRdh2KfZ_U3D-VcFeNh1HFlvxNFqKKg&s)
+
 <small>*Kaynak: [Apache Pulsar Documentation — Architecture Overview](https://pulsar.apache.org/docs/next/concepts-architecture-overview/)*</small>
 
 Okuma işlemleri için yalnızca 1 Bookie yeterlidir. Diğer Bookie'ler ilgili konu (topic) için depolama alanını çoğaltmada kullanılır. Okuma işlemlerinde bir Bookie kullanmadan, doğrudan Pulsar Broker'ın kuyruğu üzerinden de okuma yapılabilir. Buna **topic compaction** (konu sıkıştırma) denir. Topic compaction, her anahtar-değer çifti için yalnızca en son değeri bellekte tutar.
@@ -519,6 +523,7 @@ RabbitMQ ve Kafka arasında bir yerde konumlanan bu platform, RabbitMQ gibi dü�
 Apache Pulsar, veri alım mekanizması (data ingestion) olarak görev yaparak data lake mimarisinde önemli bir bileşen olabilir. Verileri data lake'e aktararak gerçek zamanlı veri işleme ve analizini mümkün kılar; böylece data lake kurulumunda gerçek zamanlı ve toplu işleme ortamları arasında bir köprü görevi görür.
 
 ![Pulsar'da Topic, Namespace, Tenants](https://miro.medium.com/v2/resize:fit:640/format:webp/1*RaObMbDyU3_DCMQziQvmDA.png)
+
 <small>*Kaynak: [In-Depth Guide on Apache Pulsar — Akash S. Das](https://medium.com/@akashsdas_dev/in-depth-guide-on-apache-pulsar-89122f3780cd)*</small>
 
 #### Topic
