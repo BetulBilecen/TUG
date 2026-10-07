@@ -4,7 +4,7 @@ Bu doküman; etcd, Consul, ZooKeeper, Kubernetes ConfigMap/Secret, Spring Cloud 
 
 ---
 
-## Giriş: Bu araçlara neden ihtiyaç var?
+## Bu araçlara neden ihtiyacımız var?
 
 Tek bir makinede çalışan basit bir uygulamanın ayarları bir dosyada durabilir. Ancak uygulama onlarca mikroservise ve yüzlerce makineye bölündüğünde şu sorular ortaya çıkar:
 
@@ -13,7 +13,28 @@ Tek bir makinede çalışan basit bir uygulamanın ayarları bir dosyada durabil
 3. **Birden fazla makine nasıl koordine olacak?** Örneğin aynı anda yalnızca tek bir makinenin işlem yapması (kilit) ya da bir lider seçilmesi gerekebilir.
 4. **Şifreler ve API anahtarları nasıl güvenli saklanacak?** Bu bilgileri kodun ya da config dosyasının içine yazmak güvenli değildir.
 
+
 Bu dokümandaki araçlar bu soruların farklı kısımlarına cevap verir.
+
+### Dağıtık sistem nedir?
+
+**Dağıtık sistem**, birden fazla bilgisayarın (düğümün) ağ üzerinden haberleşerek, dışarıdan tek bir sistem gibi görünecek şekilde birlikte çalışmasıdır. Birbiriyle konuşan mikroservisler, bir Kubernetes kümesi ya da birden fazla düğümden oluşan bir veritabanı kümesi buna örnektir.
+
+Avantajı, yükün makineler arasında paylaştırılabilmesi (ölçeklenebilirlik) ve bir makine çökse bile sistemin çalışmaya devam edebilmesidir. Bedeli ise yönetim karmaşıklığıdır: makineler birbirinin belleğini göremez, aralarındaki ağ her zaman güvenilir değildir ve her makinenin kendi durumu vardır. Yukarıdaki dört soru (ayarlar, servis keşfi, koordinasyon, gizli bilgiler) tam olarak bu karmaşıklıktan doğar.
+
+### Konfigürasyon nedir?
+
+**Konfigürasyon**, uygulamanın kodunu değiştirmeden davranışını belirleyen ayarlardır. Port numarası, log seviyesi, veritabanı adresi ya da bir özelliğin açık/kapalı olması buna örnektir.
+
+Bu değerler koda gömülmez, koddan ayrı tutulur. Böylece aynı uygulama farklı ortamlarda (geliştirme, test, production) farklı ayarlarla çalışabilir ve bir ayarı değiştirmek için uygulamayı yeniden derlemek gerekmez. Tek makinede bu ayarlar bir dosyada durabilir; dağıtık sistemde ise yüzlerce servisin ayarını tek tek dosyalarda tutmak yönetilemez hale geldiği için bu dokümandaki araçlara ihtiyaç duyulur.
+
+### Secret nedir? Secret yönetimi nedir?
+
+**Secret (gizli bilgi)**, bir sisteme ya da veriye erişmeyi sağlayan ve başkalarının eline geçmemesi gereken hassas bilgidir. Dijital sertifikalar, veritabanı kimlik bilgileri, parolalar ve API şifreleme anahtarları buna örnektir. Bu bilgi kötü niyetli birinin eline geçerse, o kişi bizim yerimize sisteme girebilir.
+
+Uygulamaların çalışabilmesi için bu bilgilere ihtiyacı vardır. Örneğin bir uygulama veritabanına bağlanmak için şifreye muhtaçtır. Bu şifrenin nerede saklanacağı, uygulamaya nasıl ulaştırılacağı, kimlerin görebileceği ve ne zaman değiştirileceği ise ayrı bir problemdir. **Secret yönetimi (secrets management)**, gizli bilgilerin güvenli şekilde saklanması, dağıtılması, erişiminin kontrol edilmesi ve düzenli olarak yenilenmesi işlerinin tamamına verilen isimdir.
+
+Secret'ı kodun içine ya da config dosyasına yazmak en basit yol gibi görünür ama güvenli değildir (Git'e yüklenebilir, loglara düşebilir, değiştirmek zordur). Vault, Secrets Manager ve Secret Manager gibi araçlar bu probleme çözüm olarak geliştirilmiştir.
 
 ### Konfigürasyon ile secret arasındaki fark
 
@@ -25,23 +46,6 @@ Dokümanın ana eksenlerinden biri bu ayrımdır:
 | Gizli mi? | Hayır | Evet |
 | Sızarsa | Genellikle sorun olmaz | Saldırgan bizim yerimize sisteme girebilir |
 | Uygun araçlar | etcd, Consul, ZooKeeper, ConfigMap, Spring Cloud Config, Parameter Store | Vault, Secrets Manager, GCP Secret Manager, Kubernetes Secret |
-
-### Hangi araç ne için?
-
-| Araç | Ana amacı | Kısaca |
-|---|---|---|
-| **etcd** | Tutarlı, dağıtık anahtar-değer deposu | Kubernetes'in veri deposu |
-| **Consul** | Servis keşfi, health check, KV | "Servisler birbirini nasıl bulur?" sorusunun cevabı |
-| **ZooKeeper** | Dağıtık koordinasyon | Lider seçimi, dağıtık kilit, grup üyeliği |
-| **Kubernetes ConfigMap** | Gizli olmayan konfigürasyon | Kubernetes içinde ayarları koddan ayırır |
-| **Kubernetes Secret** | Hassas bilgiler (Kubernetes içinde) | Base64 ile temsil edilir, şifreleme değildir |
-| **Spring Cloud Config** | Spring uygulamaları için merkezi konfigürasyon | Ayarlar Git'ten okunur |
-| **HashiCorp Vault** | Secret yönetimi | Dinamik, kısa ömürlü secret üretir |
-| **AWS Secrets Manager** | Secret saklama + otomatik rotasyon | AWS tarafından yönetilir |
-| **AWS Parameter Store** | Konfigürasyon + küçük secret'lar | Standart katman ücretsizdir |
-| **Google Cloud Secret Manager** | Secret saklama (GCP) | Sürümleme, IAM, CMEK |
-
-> 💡 **Raft** algoritması bu dokümanda birkaç yerde karşımıza çıkar. Ayrıntılı anlatımı [etcd](#1-etcd) bölümündedir; [Consul](#2-consul) ve [Vault](#7-hashicorp-vault) da Raft kullanır.
 
 ### İçindekiler
 
@@ -67,6 +71,9 @@ Dokümanın ana eksenlerinden biri bu ayrımdır:
 10. [Google Cloud Secret Manager](#10-google-cloud-secret-manager)
 
 **Ek:** [Kaynakça](#kaynakça)
+
+
+> 💡 **Raft** algoritması bu dokümanda birkaç yerde karşımıza çıkar. Ayrıntılı anlatımı [etcd](#1-etcd) bölümündedir; [Consul](#2-consul) ve [Vault](#7-hashicorp-vault) da Raft kullanır.
 
 ---
 
@@ -141,7 +148,7 @@ Adım adım:
 4. Lider onayları aldıktan sonra kendi verisini günceller.
 5. Client'a "işlem başarılı" yanıtı gönderilir.
 
-> 💡 Pratikte Raft, tüm düğümleri beklemez. Düğümlerin **çoğunluğunun (quorum)** onayı yeterlidir. Bu yüzden küme birkaç düğümünü kaybetse bile çalışmaya devam edebilir. Örneğin 4 düğümlü bir kümede çoğunluk 3'tür ve yalnızca 1 düğüm kaybı tolere edilir. Bu yüzden pratikte genellikle tek sayıda (3 veya 5) düğüm tercih edilir.
+> 💡 Pratikte Raft, tüm düğümleri beklemez. Düğümlerin **çoğunluğunun (quorum)** onayı yeterlidir. Bu yüzden küme birkaç düğümünü kaybetse bile çalışmaya devam edebilir. Örneğin 4 düğümlü bir kümede çoğunluk 3'tür ve çoğunluk işlemi onayladıysa işlem tamamlanmış sayılır. Hata toleransı hesabında çoğunluk N/2 + 1'dir (4 düğümde 3). Dolayısıyla 3 düğümün çalışması sistemi ayakta tutar ve yalnızca 1 düğüm kaybı tolere edilir. 3 düğümlü küme de aynı şekilde 1 düğüm kaybını tolere ettiği için 4. düğüm ek bir hata toleransı sağlamaz. Bu yüzden pratikte genellikle tek sayıda (3 veya 5) düğüm tercih edilir. 2 veya daha fazla düğüm kaybedilirse çoğunluk sağlanamaz ve küme çalışmaz.
 
 #### Okuma işlemi nasıl olur?
 
@@ -160,13 +167,7 @@ Düğüm A:             Düğüm B:
 3. SET x=15          3. SET x=15
 ```
 
-Yazma isteği geldiğinde süreç şöyle işler:
-
-1. Lider, işlemi kendi **Raft loguna** ekler.
-2. Log girdisi takipçilere **çoğaltılır**.
-3. Çoğaltma doğrulandıktan sonra veri **BoltDB tabanlı MVCC veritabanına** kaydedilir.
-
-Bu sayede konsensüs sağlanmadan hiçbir yazma işlemi kalıcı olmaz.
+Yazma isteği geldiğinde lider işlemi önce kendi **Raft loguna** ekler, log girdisini takipçilere **çoğaltır** ve çoğaltma doğrulandıktan sonra veriyi **BoltDB tabanlı MVCC veritabanına** kaydeder. Bu sayede konsensüs sağlanmadan hiçbir yazma işlemi kalıcı olmaz.
 
 ### Lider seçimi
 
@@ -174,15 +175,11 @@ Bu sayede konsensüs sağlanmadan hiçbir yazma işlemi kalıcı olmaz.
 
 1. Başlangıçta tüm düğümler **Follower** durumundadır ve liderden mesaj (heartbeat) bekler.
 2. Belirli bir süre boyunca mesaj gelmezse, düğüm liderde sorun olduğunu anlar ve **Candidate (aday)** durumuna geçer.
-3. Aday, diğer düğümlerden oy ister ("ben lider olmaya hazırım"). **En çok oyu alan düğüm lider olur.**
+3. Aday, diğer düğümlerden oy ister ("ben lider olmaya hazırım"). **Düğümlerin çoğunluğunun (quorum) oyunu alan düğüm lider olur.**
 
 Her düğümün zaman aşımı (timeout) süresi birbirinden farklıdır. Süresi ilk dolan düğüm adaylığını ilk duyurur ve lider olma şansı artar. Böylece aynı anda birden fazla aday çıkıp oyların bölünmesi azaltılır.
 
-Lider seçildikten sonra periyodik olarak takipçilere heartbeat gönderir. Bu heartbeat'ler takipçilerin zaman aşımı sayaçlarını sıfırlar, böylece yeni seçim başlamaz.
-
-#### Lider çökerse ne olur?
-
-Takipçiler heartbeat alamayınca yukarıdaki seçim süreci yeniden işler ve yeni bir lider seçilir.
+Lider seçildikten sonra periyodik olarak takipçilere heartbeat gönderir. Bu heartbeat'ler takipçilerin zaman aşımı sayaçlarını sıfırlar, böylece yeni seçim başlamaz. Lider çökerse takipçiler heartbeat alamaz ve yukarıdaki seçim süreci yeniden işleyerek yeni bir lider seçilir.
 
 #### Term (dönem) kavramı
 
@@ -220,7 +217,7 @@ Kubernetes (K8s), konteynerleştirilmiş uygulamaların dağıtımını, ölçek
 
 - **Control Plane (Kontrol Düzlemi):** Kümenin beynidir. Karar alma, planlama ve genel durumu yönetme işlerini yapar.
 - **Worker Node (Çalışan Düğüm):** Uygulamaları çalıştıran fiziksel veya sanal makinelerdir.
-- **Pod:** Kubernetes'in en küçük yapı taşıdır. Bir veya daha fazla konteyneri bir arada tutar.
+- **Pod:** Kubernetes'in en küçük yapı taşıdır, uygulamaların çalıştığı birimdir ([4. bölümde](#pod) ayrıntılı anlatılıyor).
 
 #### etcd'nin rolü
 
@@ -385,7 +382,7 @@ Consul cluster, **Server** ve **Client** olmak üzere iki tür yapıdan oluşur.
 
 - Anahtar-değer verilerini, servis ve node bilgilerini **saklar ve replike eder**. Yani bilgi birden fazla Consul server'da tutulur.
 - Tek server de kullanılabilir, ancak **lider seçiminin sağlıklı çalışması** ve **hata (failure) senaryoları** için birden fazla server önerilir.
-- Raft çoğunluk (quorum) ile çalıştığı için production'da genellikle **3 veya 5 server** önerilir. Tek sayı seçilmesinin sebebi, çoğunluğun net oluşabilmesidir; çift sayıdaki server ek bir hata toleransı sağlamaz.
+- Raft çoğunluk (quorum) ile çalıştığı için production'da genellikle **3 veya 5 server** önerilir ([etcd](#1-etcd) bölümündeki quorum açıklamasına bakınız). Çift sayıdaki server ek bir hata toleransı sağlamaz.
 
 > **Failure tolerance:** Sistemde bazı parçalar bozulduğunda sistemin çalışmaya devam edebilme kapasitesidir.
 
@@ -401,6 +398,7 @@ Consul cluster, **Server** ve **Client** olmak üzere iki tür yapıdan oluşur.
 Server ve Client aslında **iki farklı program değildir**. İkisinde de çalışan yapı **Consul Agent**'tır.
 
 > **Consul Agent**, bir node üzerinde sürekli çalışan Consul sürecidir.
+> **Node nedir?** Consul açısından Consul Agent'ın çalıştığı makine/instance.
 
 ```text
                  Consul Agent
@@ -414,8 +412,6 @@ Server ve Client aslında **iki farklı program değildir**. İkisinde de çalı
 ```
 
 Yani Consul tek bir programdır; bir makinede çalıştırıldığında Agent olur ve **Client modunda** ya da **Server modunda** çalışır.
-
-> **Node nedir?** Consul açısından Consul Agent'ın çalıştığı makine/instance.
 
 #### Neden her node'da Agent var?
 
@@ -437,13 +433,7 @@ Consul'un bütün işlerini tek bir merkezi server'a yaptırmak yerine, her node
       Client A     Client B     Client C
 ```
 
-#### Agent'ın görevleri
-
-- Servisleri **register** eder
-- **Health check** çalıştırır
-- Consul cluster'ıyla **iletişim** kurar
-- **Service discovery** işlemlerine aracılık eder
-- **Local node** hakkında bilgi tutar
+Agent'ın görevleri: servisleri **register** etmek, **health check** çalıştırmak, Consul cluster'ıyla **iletişim** kurmak, **service discovery** işlemlerine aracılık etmek ve **local node** hakkında bilgi tutmak.
 
 ### Önemli ayrım: state kimde?
 
@@ -458,8 +448,6 @@ Consul Server
 - **Client Agent**, cluster state'inin **sahibi değildir**. Cluster'a katılan client tarafındaki bir temsilci gibi davranır.
 - **Asıl dağıtık state**, Consul Server'larda (Server 1, 2, 3) tutulur ve server'lar arasında **Raft** ile yönetilir.
 
-#### Raft ve Server Agent'ın rolü
-
 Server agent'lar Raft'a katılarak şunları yapar:
 
 | Eylem | Anlamı |
@@ -472,8 +460,7 @@ Server agent'lar Raft'a katılarak şunları yapar:
 ### Özet
 
 - Consul = **servis kayıt defteri + health check + KV store + güvenli iletişim**
-- Servisler birbirini **HTTP API** veya **DNS** ile bulur
-- Sağlıksız instance'lar discovery sonucundan çıkarılır
+- Servisler birbirini **HTTP API** veya **DNS** ile bulur; sağlıksız instance'lar discovery sonucundan çıkarılır
 - Her node'da **Consul Agent** çalışır; **Client** veya **Server** modunda
 - **Server'lar** state'i tutar ve **Raft** ile yönetir; **Client'lar** kayıt ve health check yapıp bilgiyi server'a iletir
 
@@ -542,13 +529,15 @@ TTL znode, belirli bir süre (milisaniye cinsinden) güncellenmezse sistem taraf
 
 *TTL düğümleri varsayılan olarak kapalıdır. Kullanmak için sunucu yapılandırmasında `zookeeper.extendedTypesEnabled=true` ayarı yapılmalıdır.*
 
-### ZooKeeper kullanmanın avantajları
+### Avantajları ve kullanım alanları
+
+**Avantajları**
 
 - **Merkezi yönetim ve dinamik güncelleme:** Yapılandırma ayarları tek bir merkezde tutulur. Makineler yeniden başlatılmadan konfigürasyon değişiklikleri anında (dinamik olarak) sisteme yansıtılır.
 - **Değişiklik izleme (watch mekanizması):** Bir znode'da değişiklik olduğunda, o düğümü izleyen tüm istemcilere tek seferlik bir bildirim gönderilir. İstemci yeni veriyi çeker ve gerekiyorsa izlemeyi (watch) tekrar aktif eder.
-- **Yüksek erişilebilirlik (HA) ve hata toleransı:** ZooKeeper sunucuları çoğaltılmış (replicated) çalışır. Kümedeki sunucuların çoğunluğu (quorum) ayakta kaldığı sürece sistem kesintisiz hizmet verir. Ephemeral düğümler sayesinde ağdan kopan veya arızalanan makineler anında tespit edilebilir.
+- **Yüksek erişilebilirlik (HA) ve hata toleransı:** ZooKeeper sunucuları çoğaltılmış (replicated) çalışır. Kümedeki sunucuların çoğunluğu (quorum) ayakta kaldığı sürece sistem kesintisiz hizmet verir. Ephemeral düğümler sayesinde ağdan kopan veya arızalanan makineler, oturum zaman aşımı (session timeout) süresi dolduğunda tespit edilebilir.
 
-### Temel kullanım alanları
+**Kullanım alanları**
 
 1. **Merkezi yapılandırma yönetimi:** Tüm servislerin konfigürasyonlarını tek bir noktadan okuması.
 2. **Grup üyeliği ve lider seçimi (Leader Election):** Bir makine grubuna kimlerin dahil olduğunu takip etme ve aralarından bir yönetici (lider) atama işlemleri.
@@ -603,7 +592,7 @@ Lider (server-1) öldüğünde sadece server-2 uyandırılır. server-2 çocukla
 
 2026 yılında Apache ZooKeeper'da sistemi doğrudan etkileyen kritik zafiyetler tespit edildi. Bu açıklar **3.9.0 - 3.9.5** ve **3.8.0 - 3.8.6** sürümlerini etkilemektedir ve **3.9.6** ile **3.8.7** yamalarıyla kapatılmıştır.
 
-- **CVE-2026-79993 (Konteyner düğümü yetki atlatması):** ZooKeeper'ın belgelenmemiş (dahili) bir protokol işleyicisindeki bu açık, sistemin en ciddi zafiyetlerinden biridir. Saldırgan `deleteContainer` istek yolunu kullanarak hem oturum kontrolünü hem de DELETE ACL yetkilendirmesini devre dışı bırakabilir. Kimlik doğrulaması yapmamış bir saldırgan, 2181 portu üzerinden ham kodlar göndererek boş durumdaki persistent, container ve TTL znode'ları silebilir. Resmi client'ta bu işlem için bir API olmadığından ham protokol kullanılır.
+- **CVE-2026-79993 (Konteyner düğümü yetki atlatması):** ZooKeeper'ın belgelenmemiş (dahili) bir protokol işleyicisindeki bu açık, sistemin en ciddi zafiyetlerinden biridir. Saldırgan `deleteContainer` istek yolunu kullanarak hem oturum kontrolünü hem de DELETE ACL yetkilendirmesini devre dışı bırakabilir. Kimlik doğrulaması yapmamış bir saldırgan, 2181 portu üzerinden ham protokol mesajları göndererek boş durumdaki persistent, container ve TTL znode'ları silebilir. Resmi client'ta bu işlem için bir API olmadığından ham protokol kullanılır.
 - **CVE-2026-84501 (Log satırı enjeksiyonu):** Kimlik doğrulaması yapmamış bir saldırgan, `EnsembleAuthenticationProvider` bileşenine yeni satır (newline) karakterleri içeren `add_auth("ensemble", ...)` istekleri göndererek operasyonel log dosyalarına sahte kayıtlar ekleyebilir. Bu kayıtlar zaman damgası, log seviyesi ve hata mesajı gibi alanları taklit ettiği için gerçek loglardan ayırt edilemez. Bu durum, güvenlik ekiplerinin olaya müdahale (incident response) süreçlerini manipüle etmek için kullanılabilir.
 - **CVE-2026-24281 (Ters DNS üzerinden sunucu taklidi):** ZKTrustManager alt sistemindeki TLS sertifikası doğrulamasında, IP SAN doğrulaması başarısız olursa sistem ters DNS (PTR kaydı) sorgusuna yönelir. PTR kayıtlarını manipüle edebilen bir saldırgan, geçerli bir sertifikası olmasa bile güvenilir bir ZooKeeper sunucusu veya istemcisi gibi davranabilir.
 - **CVE-2026-59739 (Yeniden bağlanmada bilgi sızıntısı):** İstemci yeniden bağlanırken tetiklenen izleme (watch) mekanizmasında ACL kontrolü yapılmaması yüzünden ortaya çıkar. Saldırgan, var olmayan yollar üzerinde izleyiciler oluşturarak erişimi kısıtlanmış znode isimlerini, hassas kullanıcı adlarını ve dahili tanımlayıcıları öğrenebilir.
@@ -624,7 +613,7 @@ Ulusal Siber Olaylara Müdahale Merkezi (USOM) da bu zafiyetlerin aktif sistemle
 
 ### ConfigMap nedir?
 
-Kubernetes içindeki **ConfigMap**, uygulamanın kodundan ayrı olarak hassas olmayan, yani gizli olmayan konfigürasyon verilerini saklamaya yarayan Kubernetes nesnesidir. **ConfigMap gizlilik veya şifreleme sağlamaz!**
+Kubernetes içindeki **ConfigMap**, uygulamanın kodundan ayrı olarak hassas olmayan, yani gizli olmayan konfigürasyon verilerini saklamaya yarayan Kubernetes nesnesidir. **ConfigMap gizlilik veya şifreleme sağlamaz!** Şifre, API key, token gibi gizli bilgiler için [Kubernetes Secret](#5-kubernetes-secret) veya harici bir secret yönetim sistemi kullanılmalıdır.
 
 Örneğin:
 
@@ -635,11 +624,7 @@ APP_NAME=payment-service
 DB_HOST=postgres
 ```
 
-Buradaki amaç, bu değerleri doğrudan uygulamanın koduna veya Docker image'ına yazmak yerine uygulamadan ayrı olarak yönetmektir.
-
-Böylece aynı uygulama farklı ortamlarda farklı konfigürasyonlarla çalıştırılabilir.
-
-Örneğin:
+Buradaki amaç, bu değerleri doğrudan uygulamanın koduna veya Docker image'ına yazmak yerine uygulamadan ayrı olarak yönetmektir. Böylece aynı uygulama farklı ortamlarda farklı konfigürasyonlarla çalıştırılabilir:
 
 ```text
 Development:
@@ -652,8 +637,6 @@ DB_HOST=prod-postgres
 Uygulamanın kendisi değişmez, sadece kullanılan ConfigMap değişir.
 
 ConfigMap'in adı geçerli bir DNS alt alan adı olmalıdır. `data` veya `binaryData` alanının altındaki her anahtar; alfanümerik karakterlerden, `-`, `_` veya `.` karakterlerinden oluşmalıdır. `data` içinde saklanan anahtarlar, `binaryData` alanındaki anahtarlarla çakışmamalıdır.
-
-> ConfigMap hassas veriler için kullanılmaz. Şifre, API key, token gibi gizli bilgiler için Kubernetes Secret veya harici bir secret yönetim sistemi kullanılmalıdır.
 
 ```yaml
 apiVersion: v1
@@ -690,8 +673,15 @@ Dördüncü yöntem, ConfigMap'i ve verilerini okumak için kod yazmanız gerekt
 
 ConfigMap'teki veriler Pod içerisinde temel olarak iki şekilde kullanılabilir:
 
-- Environment variable olarak
-- Dosya olarak
+```text
+ConfigMap
+    │
+    ├── Environment Variable
+    │
+    └── Dosya
+```
+
+Her iki yöntemde de ConfigMap içerisindeki veriler **key-value** mantığıyla tutulur.
 
 #### Environment variable olarak
 
@@ -719,9 +709,7 @@ envFrom:
       name: app-config
 ```
 
-Böylece ConfigMap'teki değerler container içerisinde environment variable olarak kullanılabilir.
-
-Örneğin:
+Böylece ConfigMap'teki değerler container içerisinde environment variable olarak kullanılabilir:
 
 ```text
 Container Environment
@@ -729,10 +717,6 @@ Container Environment
 LOG_LEVEL=INFO
 PORT=8080
 ```
-
-Her container'ın kendi çalışma ortamı bulunduğu için container'ın environment variable'ları Dockerfile veya Kubernetes'teki Pod/Deployment tanımları üzerinden belirlenebilir. ConfigMap kullanıldığında ise bu konfigürasyon değerleri uygulamadan ayrı olarak yönetilmiş olur.
-
-ConfigMap'leri kullanmanın en yaygın yolu, aynı ad alanındaki bir Pod'da çalışan container'lar için ayarları yapılandırmaktır. Ayrıca bir ConfigMap'i ayrı olarak da kullanabilirsiniz.
 
 #### Dosya olarak
 
@@ -754,13 +738,7 @@ data:
     db_host=postgres
 ```
 
-Bu ConfigMap bir volume olarak Pod'a bağlandığında container içerisinde:
-
-```text
-/etc/config/application.conf
-```
-
-gibi bir dosya olarak görülebilir. Pod tanımında bu bağlama şöyle yapılır:
+Bu ConfigMap bir volume olarak Pod'a bağlandığında container içerisinde `/etc/config/application.conf` gibi bir dosya olarak görülebilir. Pod tanımında bu bağlama şöyle yapılır:
 
 ```yaml
 spec:
@@ -775,18 +753,6 @@ spec:
       configMap:
         name: app-config
 ```
-
-Yani temel mantık:
-
-```text
-ConfigMap
-    │
-    ├── Environment Variable
-    │
-    └── Dosya
-```
-
-Her iki yöntemde de ConfigMap içerisindeki veriler **key-value** mantığıyla tutulur.
 
 > 💡 ConfigMap sonradan değiştirilirse, environment variable olarak verilen değerler çalışan Pod'da kendiliğinden güncellenmez (Pod'un yeniden başlaması gerekir). Volume olarak bağlanan dosyalar ise bir süre sonra güncellenir (`subPath` ile bağlananlar hariç).
 
@@ -808,9 +774,7 @@ Pod
 └─────────────────────┘
 ```
 
-Kubernetes sadece container çalıştırmakla kalmaz; container'ların ağ, depolama ve yaşam döngüsü gibi kaynaklarını da yönetir.
-
-Pod, Kubernetes'in bu kaynakları container'lara sunabilmesi için oluşturduğu çalışma ortamıdır.
+Kubernetes sadece container çalıştırmakla kalmaz; container'ların ağ, depolama ve yaşam döngüsü gibi kaynaklarını da yönetir. Pod, Kubernetes'in bu kaynakları container'lara sunabilmesi için oluşturduğu çalışma ortamıdır.
 
 Pod içerisindeki container'lar:
 
@@ -818,22 +782,11 @@ Pod içerisindeki container'lar:
 - Birbirlerine `localhost` üzerinden ulaşabilir.
 - Ortak volume kullanabilir.
 
-ConfigMap ile birlikte düşündüğümüzde:
+ConfigMap ile birlikte düşündüğümüzde: ConfigMap uygulamanın kullanacağı konfigürasyonu sağlar, Pod ise container'ın çalıştığı ortamı oluşturur.
 
 ```text
-ConfigMap
-    │
-    ↓
-Pod
-    │
-    ↓
-Container
-    │
-    ↓
-Uygulama
+ConfigMap ──▶ Pod ──▶ Container ──▶ Uygulama
 ```
-
-ConfigMap uygulamanın kullanacağı konfigürasyonu sağlar, Pod ise container'ın çalıştığı ortamı oluşturur.
 
 ### Kubernetes Deployment
 
@@ -846,9 +799,7 @@ spec:
   replicas: 3
 ```
 
-yazarsak, bu uygulamadan **3 Pod'un çalışmasını istediğimizi** belirtmiş oluruz.
-
-Buradaki Pod'ları uygulamanın birbirinin replikaları gibi düşünebiliriz.
+yazarsak, bu uygulamadan **3 Pod'un çalışmasını istediğimizi** belirtmiş oluruz. Buradaki Pod'ları uygulamanın birbirinin replikaları gibi düşünebiliriz.
 
 Deployment doğrudan Pod'ları yönetmek yerine genellikle **ReplicaSet** üzerinden yönetir:
 
@@ -867,39 +818,12 @@ ReplicaSet
 
 **ReplicaSet**, Deployment tarafından belirlenen istenen sayıda Pod'un çalışmasını sağlamaya çalışır.
 
-Örneğin:
-
-```text
-İstenen Pod sayısı: 3
-Mevcut Pod sayısı: 3
-```
-
-ise herhangi bir işlem yapmaz.
-
-Ancak bir Pod çökerse:
-
-```text
-İstenen: 3
-Mevcut: 2
-```
-
-olur.
-
-ReplicaSet eksik olan Pod'u yeniden oluşturur:
-
-```text
-Pod 1
-Pod 2
-Pod 3
-```
-
-Böylece Deployment tarafından belirlenen Pod sayısının korunması sağlanır.
+- İstenen 3, mevcut 3 ise herhangi bir işlem yapmaz.
+- Bir Pod çökerse mevcut sayı 2'ye düşer; ReplicaSet eksik olan Pod'u yeniden oluşturur ve sayı tekrar 3 olur.
 
 ### Deployment ve ConfigMap birlikte nasıl çalışır?
 
-Örneğin bir SER-AI uygulamamız olduğunu düşünelim.
-
-Öncelikle uygulamanın konfigürasyon bilgilerini içeren bir ConfigMap oluşturulur:
+Örneğin bir SER-AI uygulamamız olduğunu düşünelim. Öncelikle uygulamanın konfigürasyon bilgilerini içeren bir ConfigMap oluşturulur:
 
 ```text
 serai-config
@@ -922,20 +846,15 @@ ConfigMap: serai-config
 ```text
 1. ConfigMap oluşturulur
         ↓
-2. Deployment oluşturulur
+2. Deployment oluşturulur (3 Pod ister)
         ↓
-3. Deployment, uygulamadan 3 Pod çalışmasını ister
+3. Deployment → ReplicaSet → 3 Pod oluşturulur
         ↓
-4. Deployment → ReplicaSet
+4. Pod'ların içindeki container'lar başlatılır
         ↓
-5. ReplicaSet → 3 Pod oluşturulmasını sağlar
+5. ConfigMap'teki konfigürasyonlar container'a sağlanır
         ↓
-6. Pod'ların içindeki container'lar başlatılır
-        ↓
-7. ConfigMap'teki konfigürasyonlar
-   container'a sağlanır
-        ↓
-8. Uygulama bu konfigürasyonlarla çalışır
+6. Uygulama bu konfigürasyonlarla çalışır
 ```
 
 Sonuçta yapı şu hale gelir:
@@ -962,17 +881,11 @@ Sonuçta yapı şu hale gelir:
              Uygulama  ←───────────────────┘
 ```
 
-Burada **ConfigMap Pod sayısını belirlemez**. ConfigMap, Pod'ların ve dolayısıyla container'ların kullanacağı konfigürasyonu sağlar.
-
-Deployment ise Pod sayısını ve Pod'ların yönetimini belirler.
+Burada **ConfigMap Pod sayısını belirlemez**; Pod'ların ve dolayısıyla container'ların kullanacağı konfigürasyonu sağlar. Pod sayısını ve Pod'ların yönetimini ise Deployment belirler.
 
 ### Kullanıcı isteği geldiğinde ne olur?
 
-Pod'lar uygulama çalışmaya başlamadan önce oluşturulmuş durumdadır.
-
-Kullanıcı uygulamaya istek gönderdiğinde yeni bir Pod oluşturulmaz.
-
-Örneğin:
+Pod'lar uygulama çalışmaya başlamadan önce oluşturulmuş durumdadır. Kullanıcı uygulamaya istek gönderdiğinde yeni bir Pod oluşturulmaz. **Service**, gelen isteği mevcut ve uygun Pod'lardan birine yönlendirir:
 
 ```text
 Kullanıcı
@@ -986,40 +899,12 @@ Container
 Uygulama
 ```
 
-Service, gelen isteği mevcut ve uygun Pod'lardan birine yönlendirir.
-
 ### Replica sayısının güncellenmesi
 
-Kubernetes uygulaması ilk oluşturulduğunda Deployment içerisinde çalıştırılacak Pod sayısı `replicas` değeri ile belirlenir.
+Deployment içindeki `replicas` değeri, çalıştırılacak Pod sayısını belirler. Uygulamanın yükü artar ve daha fazla Pod'a ihtiyaç duyulursa bu sayı artırılabilir. Bu işlem:
 
-Örneğin:
-
-```yaml
-replicas: 3
-```
-
-olarak ayarlanırsa Kubernetes bu uygulamadan 3 Pod çalıştırır.
-
-Uygulamanın çalışma sırasında yükü artarsa ve daha fazla Pod'a ihtiyaç duyulursa replica sayısı artırılabilir.
-
-Bu işlem:
-
-- Manuel olarak yapılabilir.
-- HPA kullanılarak otomatik olarak yapılabilir.
-
-Manuel olarak:
-
-```text
-3 Pod
-  ↓
-replicas: 10
-  ↓
-10 Pod
-```
-
-şeklinde değiştirilebilir.
-
-Otomatik olarak ise **HPA (Horizontal Pod Autoscaler)** kullanılabilir.
+- **Manuel olarak** yapılabilir (`replicas: 3` → `replicas: 10` ile 3 Pod'dan 10 Pod'a çıkılır),
+- **HPA** kullanılarak otomatik olarak yapılabilir.
 
 ### HPA (Horizontal Pod Autoscaler)
 
@@ -1027,7 +912,7 @@ Otomatik olarak ise **HPA (Horizontal Pod Autoscaler)** kullanılabilir.
 
 Buradaki **Horizontal** ifadesi, mevcut Pod'u güçlendirmek yerine **Pod sayısının artırılıp azaltılmasını** ifade eder.
 
-Örneğin HPA için:
+Örneğin HPA için şöyle bir hedef belirlenebilir:
 
 ```text
 CPU hedefi: %60
@@ -1035,39 +920,7 @@ Minimum Pod: 3
 Maksimum Pod: 10
 ```
 
-şeklinde bir hedef belirlenebilir.
-
-HPA uygulamanın metriklerini sürekli kontrol eder.
-
-CPU kullanımı hedefin üzerine çıkarsa:
-
-```text
-3 Pod
-  ↓
-CPU kullanımı arttı
-  ↓
-HPA
-  ↓
-5 Pod
-```
-
-şeklinde replica sayısını artırabilir.
-
-Yük azaldığında ise:
-
-```text
-5 Pod
-  ↓
-CPU kullanımı azaldı
-  ↓
-HPA
-  ↓
-3 Pod
-```
-
-şeklinde replica sayısını azaltabilir.
-
-Böylece yoğunluk arttığında daha fazla Pod oluşturularak yük dağıtılır, yoğunluk azaldığında ise gereksiz Pod'lar azaltılır.
+HPA metrikleri sürekli kontrol eder. CPU kullanımı hedefin üzerine çıkarsa replica sayısını artırır (örneğin 3 Pod → 5 Pod), yük azaldığında ise tekrar düşürür (5 Pod → 3 Pod). Böylece yoğunluk arttığında yük dağıtılır, yoğunluk azaldığında gereksiz Pod'lar azaltılır.
 
 HPA'nın temel çalışma mantığı:
 
@@ -1078,43 +931,81 @@ CPU / Bellek / Diğer metrikler
   ↓
 HPA
   ↓
-Replica sayısını güncelle
+Deployment'ın replica sayısını güncelle
   ↓
-Deployment / ReplicaSet
+ReplicaSet
   ↓
 Pod sayısını artır veya azalt
 ```
 
-Burada önemli nokta, **HPA'nın doğrudan Pod oluşturmak yerine Deployment'ın replica sayısını değiştirmesi**, Deployment'ın da ReplicaSet üzerinden istenen Pod sayısının oluşturulmasını sağlamasıdır.
+Önemli nokta: **HPA doğrudan Pod oluşturmaz**, Deployment'ın replica sayısını değiştirir; Pod'ları Deployment'ın ReplicaSet'i oluşturur.
 
 ---
 
 ## 5. Kubernetes Secret
 
-### Secret nedir?
+### Kubernetes Secret nedir?
 
-Kubernetes içindeki **Secret**, uygulamanın ihtiyaç duyduğu hassas bilgileri Kubernetes içerisinde saklamak ve Pod'lara sağlamak için kullanılan Kubernetes nesnesidir. ConfigMap'te hassas bilgiler saklanmaması gerektiği için çıkarılan bir teknoloji olduğunu da söyleyebiliriz.
+Secret'ın genel tanımı için [giriş bölümüne](#secret-nedir-secret-yönetimi-nedir) bakınız. **Kubernetes Secret**, bu ihtiyacı Kubernetes içinde karşılayan nesnedir: uygulamanın ihtiyaç duyduğu hassas bilgileri (parola, token, sertifika, API anahtarı vb.) Kubernetes içerisinde saklar ve Pod'lara sağlar. Böylece bu bilgilerin container image'ına ya da Pod/Deployment tanımına gömülmesi gerekmez.
+
+### Kim tarafından, ne amaçla geliştirildi?
+
+Kubernetes, **Google** tarafından başlatılan ve 2014'te açık kaynak olarak duyurulan bir projedir. 1.0 sürümü Temmuz 2015'te yayımlanmış ve proje **CNCF**'ye bağışlanmıştır. Secret nesnesi de Kubernetes'in ilk dönemlerinden beri API'nin bir parçasıdır.
+
+Secret'ın tasarım amacı, parola ve anahtar gibi bilgilerin container'lara, container'ın kendisini değiştirmeden dağıtılmasıdır. Tasarım dokümanında şu ihtiyaç öne çıkar: container'lar Kubernetes master'ı, git depoları ya da veritabanları gibi iç ve dış kaynaklara erişmek için secret'lara ihtiyaç duyar. İlk tasarımda bu bilgiler container'a özel bir volume türüyle (dosya olarak) sağlanıyordu. Ortam değişkeni olarak kullanma ise sonradan eklenmiştir.
+
+
+### Secret nasıl kullanılır?
 
 Secret'ın kullanılma akışı:
 
 **1. Secret oluşturulur**
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: database-secret
+**2. Deployment (veya Pod), Secret'i kullanacağını belirtir.** ConfigMap'te olduğu gibi iki yol vardır:
 
-stringData:
-  DB_USERNAME: postgres
-  DB_PASSWORD: my-password
+- **Environment variable olarak:**
+
+```yaml
+envFrom:
+  - secretRef:
+      name: database-secret
 ```
 
-**2.** Deployment, Secret'i kullanacağını belirtir
+Tek bir anahtarı almak için `secretKeyRef` kullanılır:
+
+```yaml
+env:
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: database-secret
+        key: DB_PASSWORD
+```
+
+- **Dosya olarak (volume):**
+
+```yaml
+spec:
+  containers:
+    - name: app
+      image: my-app:v1
+      volumeMounts:
+        - name: secret-volume
+          mountPath: /etc/secrets
+          readOnly: true
+  volumes:
+    - name: secret-volume
+      secret:
+        secretName: database-secret
+```
 
 **3.** Pod oluşturulur
 
 **4.** Secret bilgileri container'a sağlanır
+
+> 💡 ConfigMap'teki davranış Secret için de geçerlidir: Secret değişirse environment variable olarak verilen değerler çalışan Pod'da kendiliğinden güncellenmez (Pod'un yeniden başlaması gerekir). Volume olarak bağlanan dosyalar bir süre sonra güncellenir (`subPath` ile bağlananlar hariç). Volume olarak bağlanan Secret'lar node'un diskine değil, belleğe (tmpfs) yazılır.
+
+Secret genellikle ConfigMap ile birlikte kullanılır: normal ayarlar ConfigMap'te, hassas bilgiler Secret'ta durur.
 
 ```text
                  Kubernetes
@@ -1123,34 +1014,21 @@ stringData:
           │                     │
       ConfigMap              Secret
           │                     │
-          ↓                     ↓
-   Normal config          Hassas bilgiler
+     DB_HOST               DB_USERNAME
+     DB_PORT               DB_PASSWORD
           │                     │
-          ↓                     ↓
-      Pod/Container         Pod/Container
-          │                     │
-          ↓                     ↓
-      Uygulama              Uygulama
-```
-
-Secret genellikle ConfigMap ile birlikte kullanılır:
-
-```text
-            KUBERNETES
-                │
-        ┌───────┴───────┐
-        ↓               ↓
-    ConfigMap         Secret
-        ↓               ↓
-     DB_HOST        DB_USERNAME
-     DB_PORT        DB_PASSWORD
+          └──────────┬──────────┘
+                     ↓
+              Pod / Container
+                     ↓
+                 Uygulama
 ```
 
 ### Secret'lar nerede saklanır?
 
-Kubernetes kendi verilerini saklamak için [etcd](#1-etcd) kullanır. Yani Secret oluşturduğunuzda Kubernetes'in bu Secret bilgisini bir yerde saklaması gerekir ve bu bilgiler Kubernetes'in arka plandaki veri deposu olan etcd'ye kaydedilir.
+Kubernetes kendi verilerini saklamak için [etcd](#1-etcd) kullanır. Secret oluşturduğunuzda Kubernetes'in bu bilgiyi bir yerde saklaması gerekir ve bu bilgiler de etcd'ye kaydedilir.
 
-Peki o zaman Secret'a ne gerek var diye düşünebilirsiniz. Burada Secret, Kubernetes'in kendi verilerini değil; kullanıcı uygulamalarındaki ya da servislerindeki şifre gibi gizli tutulması gereken bilgileri saklar.
+Peki o zaman Secret'a ne gerek var diye düşünebilirsiniz. Burada etcd'nin tuttuğu Kubernetes'in kendi verileridir; Secret ise kullanıcı uygulamalarındaki ya da servislerindeki şifre gibi gizli tutulması gereken bilgileri temsil eden nesnedir.
 
 ### `data` ve `stringData` farkı
 
@@ -1172,13 +1050,13 @@ stringData:
 
 `stringData` kullanıldığında Kubernetes, düz metin değeri otomatik olarak base64 formatına çevirip `data` alanı altında saklar. Yani iki yazım şekli de sonuçta aynı biçimde saklanır.
 
-Burada yapılan işlem **şifreleme değil, encoding'dir** (kodlama). Bu encoding işlemini herkes geri çevirebilir, yani decode edebilir. Dolayısıyla bu bir veri gizleme işleminden ziyade, veriyi belirli bir karakter formatında temsil etme işlemidir. Peki neden base64 kullanılıyor? Base64 daha çok verinin Kubernetes API/YAML içerisindeki veri formatına uygun şekilde taşınabilmesi ve temsil edilmesi için kullanılır.
+Burada yapılan işlem **şifreleme değil, encoding'dir** (kodlama). Bu encoding işlemini herkes geri çevirebilir, yani decode edebilir. Dolayısıyla bu bir veri gizleme işleminden ziyade, veriyi belirli bir karakter formatında temsil etme işlemidir. Base64, verinin Kubernetes API/YAML içerisindeki veri formatına uygun şekilde taşınabilmesi için kullanılır.
 
 ### ConfigMap'e göre güvenlik avantajı: RBAC
 
 RBAC (Role-Based Access Control) hem ConfigMap hem Secret için geçerlidir. Ancak Secret'lar ayrı bir kaynak türü olduğu için erişim ayrı ayrı yönetilebilir. Örneğin bir kullanıcıya ConfigMap'leri okuma izni verip Secret'ları okuma izni vermemek mümkündür. Böylece kullanıcı Secret içerisindeki hassas verileri okuyamaz.
 
-Servisler tarafında ise **ServiceAccount** kullanılır. Pod'lar bir ServiceAccount ile çalışır ve RBAC kuralları ile bu ServiceAccount'un hangi Secret'lara erişebileceği belirlenebilir. Yani servislere yetkilendirme buna göre yapılabilir.
+Servisler tarafında ise **ServiceAccount** kullanılır. Pod'lar bir ServiceAccount ile çalışır ve RBAC kuralları ile bu ServiceAccount'un hangi Secret'lara erişebileceği belirlenebilir.
 
 ### etcd'de encryption at rest
 
@@ -1200,7 +1078,7 @@ bXktcGFzc3dvcmQ=
 
 Bu değeri gören biri Base64 decode ederek tekrar `my-password` elde edebilir.
 
-**Encryption at Rest:** etcd'ye yazılan Secret verilerini disk üzerinde şifreler.
+**Encryption at Rest:** etcd'ye yazılan Secret verilerini disk üzerinde şifreler. Uygun bir anahtar sayesinde şifreleme yapılır ve disk üzerinde artık doğrudan `my-password` gibi okunabilir bir veri yerine şifrelenmiş veri bulunur.
 
 ```text
 Secret
@@ -1217,11 +1095,9 @@ etcd
 Disk
 ```
 
-Bu sayede disk üzerinde artık doğrudan `my-password` gibi okunabilir bir veri yerine şifrelenmiş veri bulunur. Burada uygun bir anahtar sayesinde şifreleme yapılır.
-
 #### Secret zaten etcd'de, neden ayrıca şifreliyoruz?
 
-Eğer etcd'nin depolama alanına yetkisiz biri erişirse ve Secret'ler at rest encryption olmadan saklanıyorsa, Secret verilerine ulaşma riski vardır.
+Eğer etcd'nin depolama alanına yetkisiz biri erişirse ve Secret'ler at rest encryption olmadan saklanıyorsa, Secret verilerine ulaşma riski vardır. Bu yüzden her katman farklı bir riske karşı koruma sağlar:
 
 ```text
                     Kubernetes
@@ -1258,13 +1134,11 @@ Rotasyon, dinamik secret gibi daha gelişmiş ihtiyaçlar için harici sistemler
 
 ### Neden ihtiyaç var?
 
-Mikro hizmetler mimarisinde, birçok mikro hizmetin bir araya gelerek bir uygulamayı oluşturması yaygın bir yaklaşımdır. Bu mikro hizmetlerin her biri genellikle farklı ekipler tarafından geliştirilir ve ayrı ayrı dağıtımı sağlanır. Her servisin kendi yapılandırma dosyasını taşıması ise servis sayısı arttıkça yönetimi zorlaştırır. Spring Cloud Config bu soruna çözüm olarak yapılandırmayı merkezi bir yerde toplar.
+Mikro hizmetler mimarisinde birçok mikro hizmet bir araya gelerek bir uygulamayı oluşturur ve bunlar genellikle farklı ekipler tarafından geliştirilip ayrı ayrı dağıtılır. Her servisin kendi yapılandırma dosyasını taşıması, servis sayısı arttıkça yönetimi zorlaştırır. Spring Cloud Config bu soruna çözüm olarak yapılandırmayı merkezi bir yerde toplar.
 
 ### Spring Cloud Config Server nedir?
 
-Config Server modülü, yapılandırma dosyalarımızı bir dosya dizininden, bir Git reposundan ya da farklı servisler üzerinden (AWS, HashiCorp Vault vb.) okumamıza olanak sağlar.
-
-Bu yapı yapılandırma dosyalarını uzak bir depodan (GitHub, GitLab, Bitbucket vb.) çekmeyi ve yönetmeyi sağlar. Bunun dışında yerel (local) bir dizinden de yapılandırma dosyalarını çekebilir.
+Config Server modülü, yapılandırma dosyalarımızı uzak bir depodan (GitHub, GitLab, Bitbucket vb.), yerel (local) bir dizinden ya da farklı servisler üzerinden (AWS, HashiCorp Vault vb.) okumamıza olanak sağlar.
 
 Config Server'a bağlanıp ayarlarını oradan alan servislere de **Config Client** denir.
 
@@ -1397,21 +1271,11 @@ Kubernetes kullanılan ortamlarda [ConfigMap ve Secret](#4-kubernetes-configmap-
 
 # D. Secret Yönetimi
 
+Secret ve secret yönetimi kavramları için [giriş bölümüne](#secret-nedir-secret-yönetimi-nedir) bakınız.
+
 ---
 
 ## 7. HashiCorp Vault
-
-### Önce temel kavramlar
-
-#### Secret (gizli bilgi) nedir?
-
-Secret, bir sisteme ya da veriye erişmeyi sağlayan ve başkalarının eline geçmemesi gereken hassas bilgidir. Dijital sertifikalar, veritabanı kimlik bilgileri, parolalar ve API şifreleme anahtarları buna örnektir. Bu bilgi kötü niyetli birinin eline geçerse, o kişi bizim yerimize sisteme girebilir.
-
-#### Secret yönetimi (secrets management) nedir?
-
-Uygulamaların çalışabilmesi için bu bilgilere ihtiyacı vardır. Örneğin bir uygulama veritabanına bağlanmak için şifreye muhtaçtır. Bu şifrenin nerede saklanacağı, uygulamaya nasıl ulaştırılacağı, kimlerin görebileceği ve ne zaman değiştirileceği ise ayrı bir problemdir. Secret yönetimi, gizli bilgilerin güvenli şekilde saklanması, dağıtılması, erişiminin kontrol edilmesi ve düzenli olarak yenilenmesi işlerinin tamamına verilen isimdir.
-
-Secret'ı kodun içine ya da config dosyasına yazmak en basit yol gibi görünür ama güvenli değildir. Bu probleme çözüm olarak Vault gibi araçlar geliştirilmiştir.
 
 ### Vault nedir?
 
@@ -1435,13 +1299,19 @@ Vault, şifrelemeyi bir hizmet olarak sunar. **Transit** gizli veri motoruyla Va
 
 #### 3. Dinamik gizli bilgiler
 
-Vault, dinamik gizli bilgiler oluşturabilir. HashiCorp Vault'u diğer şifrelenmiş anahtar-değer depolarından ayıran özellik de budur. Vault, yani "isteğe bağlı" (on-demand) gizli bilgiler üretebilir.
+HashiCorp Vault'u diğer şifrelenmiş anahtar-değer depolarından ayıran özellik budur: Vault, istek geldiğinde (on-demand) gizli bilgi üretebilir. Aşağıda ayrıntılı anlatılıyor.
 
 ### Dinamik gizli bilgiler nasıl çalışır?
 
 #### Önce problem: sabit şifre
 
-Mesela bir uygulamanın veritabanına bağlanması gerekiyor. Normalde şöyle yapabiliriz:
+Mesela bir uygulamanın veritabanına bağlanması gerekiyor. Normalde şifre uygulamanın config dosyasına yazılır:
+
+```yaml
+database:
+  username: app_user
+  password: 123456
+```
 
 ```text
 Uygulama
@@ -1450,14 +1320,6 @@ Uygulama
    │ password: 123456
    ↓
 Veritabanı
-```
-
-Bu şifreyi uygulamanın config dosyasına koyduk:
-
-```yaml
-database:
-  username: app_user
-  password: 123456
 ```
 
 Buradaki problemler şunlar:
@@ -1485,33 +1347,11 @@ Uygulama
 Uygulama
 ```
 
-Bu kullanıcı adı ve şifre önceden hazırlanmış olmak zorunda değil. Uygulama istediği anda Vault oluşturabilir.
-
-#### "Okunana kadar oluşturulmaz" ne demek?
-
-Dinamik gizli bilgiler, biri okuyana (istek gelene) kadar oluşturulmaz. Şöyle düşünelim: Vault'ta `database/creds/my-role` diye bir rol tanımladık ama henüz kimse istemedi.
-
-```text
-Vault
- └── database/creds/my-role
-        ↓
-     Henüz credential yok
-```
-
-Uygulama "Bana my-role için database credential ver." dediğinde Vault gider ve oluşturur:
-
-```text
-Vault
-   │
-   ├── username → temp_user_8472
-   └── password → X7f...92K
-```
-
-Yani ihtiyaç oluştuğunda credential üretilir.
+Bu kullanıcı adı ve şifre önceden hazırlanmış olmak zorunda değil. Dinamik gizli bilgiler, biri okuyana (istek gelene) kadar oluşturulmaz. Örneğin Vault'ta `database/creds/my-role` diye bir rol tanımladık ama henüz kimse istemedi; bu durumda henüz hiçbir credential yoktur. Uygulama "Bana my-role için database credential ver." dediğinde Vault o anda oluşturur.
 
 #### Her servise farklı şifre, belirli süre geçerlilik
 
-Aynı konfigürasyona 2 farklı servis erişmek istiyor diyelim. O zaman 2 servise de farklı bir şifre gider, çünkü yapı, istek geldiği an dinamik olarak benzersiz bir şifre belirleyip göndermek üzerine kuruludur.
+Aynı konfigürasyona 2 farklı servis erişmek istiyor diyelim. İkisine de farklı bir şifre gider, çünkü yapı, istek geldiği an dinamik olarak benzersiz bir şifre belirleyip göndermek üzerine kuruludur.
 
 Bu şifreler her zaman bir **lease (kira) süresiyle** gelir. Servis belirli bir süre kadar erişebilir, süre bittikten sonra Vault ilgili kimlik bilgisini iptal eder ve şifre kullanılamaz hale gelir. İstenirse süre dolmadan elle iptal (revoke) de edilebilir.
 
@@ -1519,15 +1359,9 @@ Bu şifreler her zaman bir **lease (kira) süresiyle** gelir. Servis belirli bir
 
 ### Sızıntı problemi ve dinamik gizli bilgiler
 
-Bir diğer problemin de çözümü aslında dinamik gizli bilgilerdir. Uygulamalar genellikle gizli bilgileri günlük dosyalarında veya kayıt sistemlerinde bırakır. HashiCorp'un kurucu ortağı Armon Dadgar'a göre gizli bilgiler ayrıca harici izleme sistemlerine gönderilen istisna izleme kayıtlarında veya çökme raporlarında yakalanabilir, ya da bir hatayla karşılaşıldıktan sonra hata ayıklama uç noktaları ve teşhis sayfaları aracılığıyla sızdırılabilir. Potansiyel güvenlik açıkları listesi uzayıp gidiyor.
+Uygulamalar genellikle gizli bilgileri günlük dosyalarında veya kayıt sistemlerinde bırakır. HashiCorp'un kurucu ortağı Armon Dadgar'a göre gizli bilgiler ayrıca harici izleme sistemlerine gönderilen istisna izleme kayıtlarında veya çökme raporlarında yakalanabilir, ya da bir hatayla karşılaşıldıktan sonra hata ayıklama uç noktaları ve teşhis sayfaları aracılığıyla sızdırılabilir.
 
-Yani secret uygulamada bir kere bulundu mu farklı yerlere sızabilir. Mesela:
-
-```text
-password = "ABC123"
-```
-
-Uygulama hata verdi ve log şöyle oldu:
+Örneğin uygulama hata verdi ve log şöyle oldu:
 
 ```text
 ERROR:
@@ -1536,7 +1370,7 @@ username=app_user
 password=ABC123
 ```
 
-Artık password log sistemine gitmiş olabilir. Başka ihtimaller de var:
+Artık password log sistemine gitmiş olabilir. Secret uygulamada bir kere bulundu mu şu yerlere sızabilir:
 
 ```text
 Uygulama
@@ -1575,13 +1409,9 @@ Vault verileri bir depolama arka ucunda (storage backend) tutar. Seçeneklerden 
 
 ## 8. AWS Secrets Manager
 
-### Önce temel kavram: secret yönetimi
-
-Uygulamaların çalışabilmesi için veritabanı şifresi, API anahtarı, sertifika gibi hassas bilgilere (secret) ihtiyacı vardır. Bu bilgileri kodun ya da config dosyasının içine yazmak güvenli değildir. Secret yönetimi, bu bilgilerin güvenli saklanması, uygulamalara güvenli ulaştırılması, erişimin kontrol edilmesi ve düzenli olarak yenilenmesi işinin tamamıdır. AWS Secrets Manager, bu işi AWS üzerinde yapan hazır bir servistir.
-
 ### AWS Secrets Manager nedir?
 
-AWS Secrets Manager, API anahtarları, veri tabanı kimlik bilgileri ve şifreleme anahtarları gibi bilgilerin güvenli bir şekilde depolanması ve yönetimi için tasarlanmıştır.
+AWS Secrets Manager, API anahtarları, veri tabanı kimlik bilgileri ve şifreleme anahtarları gibi bilgilerin güvenli bir şekilde depolanması ve yönetimi için tasarlanmış, AWS üzerindeki hazır bir secret yönetimi servisidir.
 
 Servis tamamen **AWS tarafından yönetilir** (managed service). Yani [HashiCorp Vault](#7-hashicorp-vault)'un aksine kendimiz sunucu kurup bakımını yapmayız, sadece kullandığımız kadar öderiz.
 
@@ -1595,7 +1425,7 @@ AWS Secrets Manager, **Amazon Web Services (AWS)** tarafından geliştirilmişti
 
 KMS ile sırların built-in olarak şifrelenmesini ve şifrelerinin çözülmesini sağlar.
 
-> **KMS (Key Management Service)** AWS'nin şifreleme anahtarlarını yönettiği servistir. Secret'lar Secrets Manager'a yazılırken bu anahtarlarla şifrelenir, okunurken çözülür. Düz metin olarak saklanamaz. Varsayılan AWS yönetimli anahtar yerine kendi oluşturduğumuz KMS anahtarı da seçilebilir.
+> **KMS (Key Management Service)**, AWS'nin şifreleme anahtarlarını oluşturup yönettiği, tamamen yönetilen servistir. Secret'lar Secrets Manager'a yazılırken bu anahtarlarla şifrelenir, okunurken çözülür. Düz metin olarak saklanamaz. Varsayılan AWS yönetimli anahtar yerine kendi oluşturduğumuz KMS anahtarı da seçilebilir. [Parameter Store](#9-aws-parameter-store) da aynı KMS servisini kullanır.
 
 #### 2. IAM ile erişim kontrolü
 
@@ -1683,21 +1513,6 @@ Kullandıkça ödeme modeli vardır:
 
 Bu yüzden uygulamada secret'ı **her istekte** yeniden çekmek yerine bir kez okuyup bellekte (cache) tutmak hem maliyeti hem gecikmeyi azaltır.
 
-### Parameter Store ile fark
-
-AWS'de bir de **Systems Manager Parameter Store** vardır ([sonraki bölümde](#9-aws-parameter-store) anlatılıyor). İkisi benzer görünür ama amaçları farklıdır:
-
-| | Secrets Manager | Parameter Store |
-|---|---|---|
-| Amaç | Secret saklama + rotasyon | Yapılandırma değerleri ve küçük secret'lar |
-| Otomatik rotasyon | ✅ Var | ❌ Yok |
-| Boyut sınırı | 64 KB | 4 KB (standart), 8 KB (gelişmiş) |
-| Ücret | Secret başına 0,40 $/ay | Standart parametreler ücretsiz |
-| Şifreleme | Her zaman şifreli | Sadece `SecureString` türünde şifreli |
-| Çapraz bölge çoğaltma | ✅ Hazır | ❌ Hazır değil |
-
-Kısaca: rotasyon gereken gizli bilgiler (veritabanı şifresi gibi) için Secrets Manager, rotasyon gerekmeyen sıradan ayarlar için Parameter Store daha uygundur.
-
 ### HashiCorp Vault ile fark
 
 | | AWS Secrets Manager | HashiCorp Vault |
@@ -1709,6 +1524,10 @@ Kısaca: rotasyon gereken gizli bilgiler (veritabanı şifresi gibi) için Secre
 
 Önemli fark şudur: Secrets Manager mevcut bir secret'ı **zaman zaman değiştirir**, ama aynı anda onu okuyan tüm servisler aynı geçerli değeri görür. Vault'un dinamik secret özelliğinde ise her servis, istek geldiği anda **kendine özel** bir kimlik bilgisi alır.
 
+### Parameter Store ile fark
+
+AWS'de bir de **Systems Manager Parameter Store** vardır. İkisi benzer görünür ama amaçları farklıdır. Karşılaştırma [Parameter Store bölümünde](#secrets-manager-ile-fark) verilmiştir.
+
 ### Spring Cloud Config ile ilişkisi
 
 [Spring Cloud Config Server](#6-spring-cloud-config), yapılandırma kaynağı olarak AWS Secrets Manager'ı da kullanabilir. Kullandığımız Spring Cloud sürümüne göre ayar adları değişebileceği için resmi dokümana bakmak gerekir.
@@ -1717,13 +1536,9 @@ Kısaca: rotasyon gereken gizli bilgiler (veritabanı şifresi gibi) için Secre
 
 ## 9. AWS Parameter Store
 
-### Önce temel kavram: yapılandırma ve parametre yönetimi
-
-Uygulamaların çalışması için veritabanı adresi, ortam adı (dev/prod), özellik anahtarları ve bazen şifreler gibi ayarlara ihtiyacı vardır. Bu ayarları kodun içine yazmak, her değişiklikte uygulamayı yeniden derlemeyi gerektirir ve hassas olanlar için güvenli değildir. Parametre yönetimi, bu ayarların kodun dışında, merkezi bir yerde saklanması ve uygulamaların oradan okumasıdır. AWS Parameter Store, bu işi AWS üzerinde yapan hazır bir servistir.
-
 ### AWS Parameter Store nedir?
 
-Sunucu, servis ya da uygulama ayarları ve ortam değişkenleri gibi hassas olan veya olmayan veriler dahil olmak üzere parametreleri depolamak ve yönetmek için kullanılır.
+Parameter Store; sunucu, servis ya da uygulama ayarları ve ortam değişkenleri gibi hassas olan veya olmayan veriler dahil olmak üzere parametreleri depolamak ve yönetmek için kullanılır. Ayarları kodun dışında, merkezi bir yerde tutar ve uygulamalar oradan okur; böylece her ayar değişikliğinde uygulamayı yeniden derlemek gerekmez.
 
 Parameter Store, **AWS Systems Manager (SSM)** servisinin bir parçasıdır. Servis AWS tarafından yönetilir (managed service), yani sunucu kurup bakımını yapmamız gerekmez.
 
@@ -1758,9 +1573,7 @@ Bu sayede ortama ve servise göre ayrım yapılır ve tek bir istekle bir yolun 
 
 #### 3. KMS ile şifreleme
 
-KMS ile encryption at rest destekler. Bu, **SecureString** türündeki parametrelerin değerlerinin KMS anahtarıyla şifrelenerek saklanması demektir. Parametrenin adı düz metin kalır, sadece değeri şifrelenir. Varsayılan olarak AWS'nin yönettiği `alias/aws/ssm` anahtarı kullanılır, istenirse kendi KMS anahtarımız seçilebilir.
-
-> **KMS (Key Management Service):** Bulut ortamındaki verilerinizi şifrelemek ve bu şifreleme işlemlerinde kullanılan kriptografik anahtarları güvenli bir şekilde oluşturup yönetmek için kullanılan tamamen yönetilen bir AWS servisidir.
+**SecureString** türündeki parametrelerin değerleri KMS anahtarıyla şifrelenerek saklanır (encryption at rest). Parametrenin adı düz metin kalır, sadece değeri şifrelenir. Varsayılan olarak AWS'nin yönettiği `alias/aws/ssm` anahtarı kullanılır, istenirse kendi KMS anahtarımız seçilebilir. KMS'in ne olduğu için [Secrets Manager bölümüne](#8-aws-secrets-manager) bakınız.
 
 **Şifre çözme nasıl olur?** Şifreleme ve çözme işini Parameter Store, KMS'i kullanarak kendisi yapar. Uygulamanın kendi başına şifre çözmesi gerekmez. Ancak SecureString parametreyi alırken **şifresinin çözülmesini istediğimizi** belirtmemiz gerekir. Bu seçenek `WithDecryption=true` (CLI'da `--with-decryption`) şeklindedir. Bu seçenek verilmezse parametre **şifreli (ciphertext) olarak** gelir.
 
@@ -1768,11 +1581,11 @@ KMS ile encryption at rest destekler. Bu, **SecureString** türündeki parametre
 
 #### 4. Sürümleme
 
-Parametre değişikliklerini otomatik olarak takip eder, her güncellemede yeni bir sürüm numarası oluşur. Böylece önceki sürümlere erişebilir ve gerekirse eski değeri tekrar kullanabiliriz. Yapılandırma verilerini ve şifrelenmiş dizeleri hiyerarşik yapıda saklarken sürümleri de takip edebiliriz.
+Parametre değişikliklerini otomatik olarak takip eder, her güncellemede yeni bir sürüm numarası oluşur. Böylece önceki sürümlere erişebilir ve gerekirse eski değeri tekrar kullanabiliriz.
 
 #### 5. IAM ile erişim kontrolü ve denetim
 
-AWS Kimlik ve Erişim Yönetimi (IAM) politikalarını kullanarak parametrelere erişimi kısıtlar. Erişim kontrolünü ve denetimini ayrıntılı seviyelerde gerçekleştirebiliriz. Hiyerarşik isimler burada işe yarar: bir servise sadece kendi yolunun altına erişim verilebilir.
+IAM politikalarını kullanarak parametrelere erişimi kısıtlar. Hiyerarşik isimler burada işe yarar: bir servise sadece kendi yolunun altına erişim verilebilir.
 
 ```json
 {
@@ -1796,9 +1609,7 @@ AWS Lambda, EC2, ECS ve diğer hizmetlerle sorunsuz yapılandırma yönetimi iç
 
 - Sunucu yönetimi gerektirmeyen, güvenli, ölçeklenebilir ve barındırılan (managed) bir yapılandırma ve gizli bilgi yönetimi hizmeti kullanırız.
 - Verilerimizi kodumuzdan ayırarak güvenlik durumumuzu iyileştiririz.
-- Yapılandırma verilerini ve şifrelenmiş dizeleri hiyerarşik yapıda saklar, sürümleri takip ederiz.
 - Erişim kontrolünü ve denetimini ayrıntılı seviyelerde yaparız.
-- Parametreler birden fazla kullanılabilirlik bölgesinde saklandığı için güvenilirdir.
 
 ### Standart ve gelişmiş (Advanced) katman
 
@@ -1861,16 +1672,18 @@ aws ssm get-parameters-by-path \
 
 ### Secrets Manager ile fark
 
-Önceki bölümde ([AWS Secrets Manager](#8-aws-secrets-manager)) bu iki servisi karşılaştırmıştık. Kısaca:
+[AWS Secrets Manager](#8-aws-secrets-manager) ile Parameter Store benzer görünür ama amaçları farklıdır:
 
 | | Parameter Store | Secrets Manager |
 |---|---|---|
 | Asıl amaç | Yapılandırma değerleri ve küçük secret'lar | Secret saklama + rotasyon |
 | Otomatik rotasyon | ❌ Yok | ✅ Var |
-| Ücret | Standart katman ücretsiz | Secret başına aylık ücret |
-| Şifreleme | Sadece SecureString'de | Her zaman |
+| Boyut sınırı | 4 KB (standart), 8 KB (gelişmiş) | 64 KB |
+| Ücret | Standart parametreler ücretsiz | Secret başına 0,40 $/ay |
+| Şifreleme | Sadece `SecureString` türünde | Her zaman |
+| Çapraz bölge çoğaltma | ❌ Hazır değil | ✅ Hazır |
 
-Rotasyon gerekmeyen sıradan ayarlar ve küçük secret'lar için Parameter Store, düzenli olarak yenilenmesi gereken veritabanı şifresi gibi bilgiler için Secrets Manager daha uygundur.
+Kısaca: rotasyon gereken gizli bilgiler (veritabanı şifresi gibi) için Secrets Manager, rotasyon gerekmeyen sıradan ayarlar ve küçük secret'lar için Parameter Store daha uygundur.
 
 ### Spring ile ilişkisi
 
@@ -1882,6 +1695,20 @@ Spring tarafında **Spring Cloud AWS**, Parameter Store'u uygulamanın yapıland
 
 Secret Manager, API anahtarları, kullanıcı adları, parolalar, sertifikalar ve token'lar gibi hassas verileri güvenli bir şekilde saklamaya ve yönetmeye olanak tanıyan bir gizli bilgi ve kimlik bilgisi yönetimi hizmetidir.
 
+Dağıtık bir sistemde birden fazla uygulama (Backend 1, Backend 2, Worker) aynı gizli bilgilere (örneğin `DB_PASSWORD`) ihtiyaç duyabilir. Bu bilgileri her uygulamanın koduna ayrı ayrı yazmak yerine Secret Manager merkezi bir kaynak olur: bir şifre değiştiğinde tek yerde güncellenir, Git deposuna yanlışlıkla yüklenme riski azalır ve erişim izinleri tek noktadan yönetilir.
+
+```text
+                 Secret Manager
+                       │
+                 DB_PASSWORD
+                       │
+          ┌────────────┼────────────┐
+          ↓            ↓            ↓
+      Backend 1    Backend 2      Worker
+```
+
+Uygulamalar, gerekli izinlere sahip olduklarında gizli bilgileri Secret Manager üzerinden alır.
+
 ### Secret Version (gizli bilgi sürümleri)
 
 Secret Manager, gizli bilgilerin farklı sürümlerini yönetmeyi sağlar. Sürümler, kademeli dağıtımları ve gerektiğinde geri almayı kolaylaştırır.
@@ -1890,8 +1717,8 @@ Secret Manager, gizli bilgilerin farklı sürümlerini yönetmeyi sağlar. Sür�
 
 ```text
 DATABASE_PASSWORD
-    ├── Version 1 → Eski şifre
-    ├── Version 2 → Yeni şifre
+    ├── Version 1 → İlk şifre
+    ├── Version 2 → Önceki şifre
     └── Version 3 → Güncel şifre
 ```
 
@@ -1914,7 +1741,7 @@ IAM, kullanıcıların ve servislerin hangi kaynaklar üzerinde hangi işlemleri
 
 Secret Manager'da IAM rolleri ve koşulları kullanılarak gizli bilgilere erişim sınırlandırılabilir. Bir kullanıcıya veya servise Secret Manager üzerinde genel yönetici yetkisi vermek yerine yalnızca ihtiyaç duyduğu secret üzerinde belirli bir rol verilebilir.
 
-Örneğin, bir backend servisinin yalnızca `MQTT_PASSWORD` gizli bilgisine erişmesi istenebilir.
+Örneğin, bir backend servisinin yalnızca `MQTT_PASSWORD` gizli bilgisine erişmesi istenebilir. Bunun için ilgili secret üzerinde uygun IAM rolü ve izinleri tanımlanır; backend'in diğer secret'lara erişmesi engellenir.
 
 ```text
 Backend
@@ -1925,8 +1752,6 @@ Secret Manager
    ↓
 MQTT_PASSWORD
 ```
-
-Bu durumda backend'in diğer secret'lara erişmesi engellenebilir. Bunun için ilgili secret üzerinde uygun IAM rolü ve izinleri tanımlanır.
 
 **Least Privilege (En Az Ayrıcalık):** Kullanıcılara ve servislere yalnızca görevlerini yerine getirmek için ihtiyaç duydukları izinleri verme prensibidir.
 
@@ -1943,58 +1768,15 @@ Secret Manager'da iki temel çoğaltma türü vardır.
 
 #### Automatic Replication (otomatik çoğaltma)
 
-Google Cloud, çoğaltma konumlarını kendisi yönetir. Kullanıcının belirli bölgeleri tek tek seçmesi gerekmez.
-
-- Çoğaltma yönetimi Google Cloud tarafından yapılır.
-- Kullanıcı, çoğaltma konumlarını ayrı ayrı belirlemek zorunda kalmaz.
-- Fiyatlandırma, otomatik çoğaltma için geçerli ücretlendirme modeline göre yapılır.
+Google Cloud, çoğaltma konumlarını kendisi yönetir. Kullanıcının belirli bölgeleri tek tek seçmesi gerekmez. Fiyatlandırma, otomatik çoğaltma için geçerli ücretlendirme modeline göre yapılır.
 
 #### User-managed Replication (kullanıcı tarafından yönetilen çoğaltma)
 
-Kullanıcı, gizli bilgilerin hangi Google Cloud bölgelerinde çoğaltılacağını belirleyebilir.
-
-- Çoğaltma konumları ihtiyaca göre seçilir.
-- Coğrafi konum ve veri yerleşimi gereksinimleri üzerinde daha fazla kontrol sağlanır.
-- Fiyatlandırma, seçilen konumlara ve geçerli ücretlendirme modeline bağlıdır.
-
-### Secret Manager neden kullanılır?
-
-Dağıtık bir sistemde birden fazla uygulama ve servis aynı gizli bilgilere ihtiyaç duyabilir.
-
-Örneğin:
-
-```text
-Backend 1
-   └── DB_PASSWORD
-
-Backend 2
-   └── DB_PASSWORD
-
-Worker
-   └── DB_PASSWORD
-```
-
-Gizli bilgiler her uygulamanın koduna veya yapılandırma dosyasına ayrı ayrı yazılırsa bu bilgilerin yönetimi zorlaşır. Bir şifre değiştiğinde birden fazla uygulamanın güncellenmesi gerekebilir. Ayrıca gizli bilgilerin yanlışlıkla Git deposuna yüklenmesi gibi güvenlik riskleri ortaya çıkar.
-
-Secret Manager, gizli bilgilerin merkezi olarak saklanmasını ve erişim izinlerinin yönetilmesini sağlar.
-
-```text
-                 Secret Manager
-                       │
-                 DB_PASSWORD
-                       │
-          ┌────────────┼────────────┐
-          ↓            ↓            ↓
-      Backend 1    Backend 2      Worker
-```
-
-Uygulamalar, gerekli izinlere sahip olduklarında gizli bilgileri Secret Manager üzerinden alabilir. Böylece gizli değerlerin doğrudan uygulama kodunda tutulması ihtiyacı azaltılır.
+Kullanıcı, gizli bilgilerin hangi Google Cloud bölgelerinde çoğaltılacağını belirleyebilir. Çoğaltma konumları ihtiyaca göre seçilir ve coğrafi konum ile veri yerleşimi gereksinimleri üzerinde daha fazla kontrol sağlanır. Fiyatlandırma, seçilen konumlara ve geçerli ücretlendirme modeline bağlıdır.
 
 ### Secret Manager ile etcd ve Consul'un birlikte kullanılması
 
-[etcd](#1-etcd) ve [Consul](#2-consul) gibi teknolojiler dağıtık sistemlerde konfigürasyon yönetimi için kullanılabilir. Secret Manager ise hassas bilgilerin güvenli şekilde saklanmasına ve erişiminin yönetilmesine odaklanır.
-
-Bu teknolojiler aynı sistem içerisinde birlikte kullanılabilir.
+[etcd](#1-etcd) ve [Consul](#2-consul) normal konfigürasyonun, Secret Manager ise hassas bilgilerin yönetimine odaklanır. Bu yüzden birbirinin alternatifi olmak zorunda değildir; aynı sistem içinde birlikte çalışabilir (normal ve gizli bilgi ayrımı için [giriş bölümündeki tabloya](#konfigürasyon-ile-secret-arasındaki-fark) bakınız):
 
 ```text
                     Uygulama
@@ -2011,23 +1793,6 @@ Bu teknolojiler aynı sistem içerisinde birlikte kullanılabilir.
              ├── DB_HOST         └── JWT_SECRET
              └── SERVICE_URL
 ```
-
-Örneğin:
-
-- `PORT=8080` → Uygulamanın çalışacağı portu belirtir.
-- `LOG_LEVEL=INFO` → Loglama seviyesini belirler.
-- `DB_HOST=postgres.internal` → Veritabanı adresini belirtir.
-- `DB_PASSWORD=...` → Veritabanına erişmek için kullanılan gizli bilgidir.
-- `API_KEY=...` → Bir API'ye erişmek için kullanılan gizli bilgidir.
-
-İlk üç örnek genellikle normal konfigürasyon değerleridir. Veritabanı şifresi ve API anahtarı ise gizli bilgi olarak ele alınmalıdır.
-
-**Özetle:**
-
-- **etcd / Consul:** Dağıtık sistemlerde normal konfigürasyonların ve ilgili servis bilgilerinin yönetiminde kullanılabilir.
-- **Google Cloud Secret Manager:** Parola, API anahtarı, token ve benzeri hassas bilgilerin saklanması, sürümlenmesi, erişim kontrolü ve yönetimi için kullanılır.
-
-Bu teknolojiler birbirinin doğrudan alternatifi olmak zorunda değildir; farklı ihtiyaçları karşılayarak aynı sistemde birlikte çalışabilir.
 
 ---
 
