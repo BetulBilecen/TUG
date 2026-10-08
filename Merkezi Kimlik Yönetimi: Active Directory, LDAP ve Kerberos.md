@@ -1,5 +1,40 @@
 # Merkezi Kimlik Yönetimi: Active Directory, LDAP ve Kerberos
 
+## İçindekiler
+
+- [Giriş](#giriş)
+- [1. Neden Merkezi Kimlik Yönetimi Gerekli?](#1-neden-merkezi-kimlik-yönetimi-gerekli)
+- [2. Active Directory (AD)](#2-active-directory-ad)
+  - [2.1 Active Directory Nedir?](#21-active-directory-nedir)
+  - [2.2 Veritabanı: ntds.dit](#22-veritabanı-ntdsdit)
+  - [2.3 Workgroup ile Farkı](#23-workgroup-ile-farkı)
+  - [2.4 Özellikler](#24-özellikler)
+  - [2.5 Group Policy (GPO)](#25-group-policy-gpo)
+  - [2.6 Active Directory Rolleri (FSMO Rolleri)](#26-active-directory-rolleri-fsmo-rolleri)
+  - [2.7 Authentication ve Authorization](#27-authentication-ve-authorization)
+  - [2.8 Active Directory'nin Desteklediği Teknolojiler](#28-active-directorynin-desteklediği-teknolojiler)
+  - [2.9 Avantajları](#29-avantajları)
+  - [2.10 Dezavantajları](#210-dezavantajları)
+- [3. LDAP (Lightweight Directory Access Protocol)](#3-ldap-lightweight-directory-access-protocol)
+  - [3.1 LDAP Nedir?](#31-ldap-nedir)
+  - [3.2 Dizinde Tutulan Veri Türleri](#32-dizinde-tutulan-veri-türleri)
+  - [3.3 LDAP Nasıl Çalışır?](#33-ldap-nasıl-çalışır)
+  - [3.4 LDAP'ta Kimlik Doğrulama: Bind](#34-ldapta-kimlik-doğrulama-bind)
+  - [3.5 LDAP'ın Avantajları](#35-ldapın-avantajları)
+  - [3.6 LDAP'ın Dezavantajları](#36-ldapın-dezavantajları)
+- [4. Kerberos](#4-kerberos)
+  - [4.1 Kerberos Nedir?](#41-kerberos-nedir)
+  - [4.2 Temel Terimler](#42-temel-terimler)
+  - [4.3 Kerberos Kimlik Doğrulama Süreci Nasıl Çalışır?](#43-kerberos-kimlik-doğrulama-süreci-nasıl-çalışır)
+  - [4.4 Kullanım Yerleri](#44-kullanım-yerleri)
+  - [4.5 Avantajları](#45-avantajları)
+  - [4.6 Dezavantajları ve Zayıf Noktaları](#46-dezavantajları-ve-zayıf-noktaları)
+- [Kaynaklar](#kaynaklar)
+
+---
+
+## Giriş
+
 Geleneksel olarak kullanıcılar bilgisayar sistemlerine erişirken bir parola girer. Bu yöntemin en büyük zorluğu şudur: Bilgisayar korsanları parolayı ele geçirirse kullanıcının kimliğine bürünebilir ve kuruluşun ağına erişim sağlayabilir. Kuruluşların sistemlerini ve kullanıcılarını korumak için daha iyi bir yönteme ihtiyacı vardır.
 
 Bu dokümanda merkezi kimlik yönetiminin neden gerekli olduğunu, bu işi yapan **Active Directory**'yi, ona erişmek için kullanılan **LDAP** protokolünü ve kimlik doğrulamayı güvenli hale getiren **Kerberos**'u sırasıyla ele alacağız.
@@ -8,7 +43,7 @@ Bu dokümanda merkezi kimlik yönetiminin neden gerekli olduğunu, bu işi yapan
 
 ---
 
-# 1. Neden Merkezi Kimlik Yönetimine İhtiyaç Var?
+## 1. Neden Merkezi Kimlik Yönetimi Gerekli?
 
 Günümüzde dağıtık sistemlerin (örneğin mikroservis mimarilerinin) hızla artması, güvenlik ve yönetim süreçlerini oldukça karmaşık hale getirmiştir. İçinde hassas veriler barındıran bu sistemlerin birbiriyle güvenlik onayı olmadan doğrudan iletişim kurması kabul edilemez. Öte yandan her sistemin kendine ait ayrı bir kimlik doğrulama prosedürü olması da süreci yönetilemez hale getirir.
 
@@ -23,9 +58,9 @@ Tüm bu sebeplerden dolayı ağ kaynaklarını ve kullanıcı kimliklerini tek b
 
 ---
 
-# 2. Active Directory (AD)
+## 2. Active Directory (AD)
 
-## 2.1 Active Directory Nedir?
+### 2.1 Active Directory Nedir?
 
 Active Directory, Microsoft tarafından bu sorunları çözmek ve ağ yönetimini daha etkili hale getirmek için geliştirilmiştir. Temelleri Windows NT işletim sistemiyle atılmış, 2000'lerin başında Windows Server ile birlikte kullanıma sunulmuş ve kendini geliştirerek günümüzdeki halini almıştır.
 
@@ -33,7 +68,7 @@ Kısaca Active Directory'ye merkezi bir kimlik yönetim sistemi diyebiliriz. Ayn
 
 Active Directory öncelikle Microsoft Windows'un bir özelliğidir, ancak diğer işletim sistemleri de sınırlı ölçüde buna katılabilir. Örneğin Linux tabanlı bir bilgisayarı bir Active Directory ortamına dahil edebilirsiniz.
 
-## 2.2 Veritabanı: ntds.dit
+### 2.2 Veritabanı: ntds.dit
 
 Active Directory'nin veritabanı **`ntds.dit`** dosyasıdır (*New Technology Directory Services - Directory Information Tree*). Tüm sorgulama ve değişiklik işlemleri ile veritabanı yönetimi, **ESE (Extensible Storage Engine)** adlı veritabanı motoru tarafından yürütülür.
 
@@ -46,7 +81,7 @@ Bu merkezi veritabanında şunlar tutulur:
 - **E-posta hizmetleriyle ilgili veriler:** Active Directory, e-posta hizmetlerini sağlayan Exchange Server ile bütünleşir. Kullanıcıların e-posta hesapları ve iletişim bilgileri AD'de saklanır; böylece Exchange Server, AD ile koordineli çalışabilir.
 - **Group Policy ayarları:** Ağdaki bilgisayarlar ve kullanıcı hesapları üzerinde merkezi olarak değişiklik yapmamızı sağlar.
 
-## 2.3 Workgroup ile Farkı
+### 2.3 Workgroup ile Farkı
 
 Active Directory kullanılmayan sistemlerde, aynı ağdaki her bilgisayarın kullanıcı ve parola bilgilerini tutan kendi küçük veritabanı vardır. Microsoft bu yapıyı **Workgroup** olarak adlandırır.
 
@@ -58,7 +93,7 @@ Ağ küçükse Workgroup yönetilebilir, fakat bilgisayar sayısı arttıkça i�
 
 Active Directory bu sınırlamalara çözüm sunar. Tüm kullanıcıları ve parolalarını merkezi bir veritabanında tutar. Bir kullanıcının parolası değiştiğinde ağdaki tüm bilgisayarlar bu değişiklikten haberdar olur.
 
-## 2.4 Özellikler
+### 2.4 Özellikler
 
 * Yönetilebilirlik
 * Ölçeklenebilirlik
@@ -69,7 +104,7 @@ Active Directory bu sınırlamalara çözüm sunar. Tüm kullanıcıları ve par
 * Group Policy ile yönetim
 * DNS ve DHCP gibi servislerle birlikte çalışabilme
 
-## 2.5 Group Policy (Grup İlkesi)
+### 2.5 Group Policy (GPO)
 
 Active Directory ile birlikte gelen Group Policy sayesinde çeşitli kısıtlamalar yapılabilir ve kullanıcılar bu kısıtlamalara dahil edilebilir. Örnekler:
 
@@ -83,7 +118,7 @@ Group Policy Objects (GPO) üç gruba ayrılır:
 
 ---
 
-## 2.6 Active Directory Rolleri (FSMO Rolleri)
+### 2.6 Active Directory Rolleri (FSMO Rolleri)
 
 Active Directory içerisinde beş temel rol vardır ve her birinin görevi farklıdır.
 
@@ -101,7 +136,7 @@ Active Directory içerisinde beş temel rol vardır ve her birinin görevi farkl
    - Eski nesil sistemler veya Kerberos desteklemeyen uygulamalar ağa bağlanmak istediğinde kimlik doğrulama işlemini PDC Emulator üstlenir.
 5. **Infrastructure Master (Altyapı Yöneticisi):** Nesnelerdeki değişikliklerin güncellenmesinden ve farklı domain'ler arasındaki nesne ilişkilerinin yönetilmesinden sorumludur.
 
-## 2.7 Authentication ve Authorization
+### 2.7 Authentication ve Authorization
 
 Bu iki kavram sık karıştırılır, o yüzden ayrı ayrı bakalım:
 
@@ -109,7 +144,7 @@ Bu iki kavram sık karıştırılır, o yüzden ayrı ayrı bakalım:
 * **Authorization (Yetkilendirme):** Kimlik doğrulamadan sonra bir kullanıcının veya cihazın belirli kaynaklara (dosyalar, sunucular vb.) erişim hakkının kontrol edilmesi sürecidir. Kullanıcının hangi kaynaklara erişebileceği ve ne tür işlemler yapabileceği bu aşamada belirlenir.
 
 
-## 2.8 Active Directory'nin Desteklediği Teknolojiler
+### 2.8 Active Directory'nin Desteklediği Teknolojiler
 
 1. **DHCP (Dynamic Host Configuration Protocol):** Ağdaki bilgisayarlara, sunuculara ve diğer cihazlara otomatik olarak IP adresi dağıtır. Cihazların manuel ayar yapmadan ağa ve Active Directory ortamına dahil olmasını sağlar.
 2. **DNS (Domain Name System):** Temel görevi IP adreslerini isimlerle eşleştirmektir. İstemcilerin (client) giriş yapacakları Domain Controller sunucusunu bulabilmesi tamamen DNS kayıtları sayesinde gerçekleşir. **DNS çökerse Active Directory de çalışamaz.**
@@ -118,7 +153,7 @@ Bu iki kavram sık karıştırılır, o yüzden ayrı ayrı bakalım:
 5. **NTLM (New Technology LAN Manager):** Kerberos'tan önceki eski nesil kimlik doğrulama protokolüdür. Barındırdığı güvenlik zafiyetleri nedeniyle günümüzde öncelikli olarak tercih edilmez; yalnızca Kerberos'u desteklemeyen eski işletim sistemleri ve uygulamalarla geriye dönük uyumluluk (legacy) için yedekte tutulur.
 6. **LDAPS (LDAP Secure):** LDAP protokolünün SSL/TLS sertifikalarıyla şifrelenmiş, güvenli hale getirilmiş sürümüdür. Bilgi alışverişi sırasında kullanıcı adlarının veya şifrelerin ağda düz metin olarak okunmasını ve dinlenmesini engeller.
 
-## 2.9 Avantajları
+### 2.9 Avantajları
 
 - Yönetimi merkezileştirir ve güvenlik işlemlerini kolaylaştırır.
 - Kullanıcılara grup bazında yetkilendirme veya kısıtlama yapılabilir.
@@ -132,7 +167,7 @@ Burada geçen iki kavramı kısaca açıklayalım:
 * **Firewall (Güvenlik Duvarı):** Genelde ağı korurken cihazların IP adreslerine göre kural yazar. Active Directory ile entegre olduğunda ise IP adresleri yerine doğrudan kullanıcıların kimliklerini ve gruplarını tanıyıp bunlar üzerinden yönetim yapılmasını sağlar.
 * **Replication (Çoğaltma):** Active Directory veritabanının (`ntds.dit`) ağdaki birden fazla sunucu (Domain Controller) arasında sürekli olarak senkronize edilmesi, yani kopyalanması işlemidir.
 
-## 2.10 Dezavantajları
+### 2.10 Dezavantajları
 
 - Active Directory'nin karmaşıklığı yanlış yapılandırmalara yol açabilir. Bu yüzden doğru kurulması ve yönetilmesi çok önemlidir.
 - Eski veya ayrılmış kullanıcı hesaplarının sistemde saklanması güvenlik açıklarına neden olabilir. Bu hesaplar düzenli olarak devre dışı bırakılmalı veya silinmelidir.
@@ -140,9 +175,9 @@ Burada geçen iki kavramı kısaca açıklayalım:
 
 ---
 
-# 3. LDAP (Lightweight Directory Access Protocol)
+## 3. LDAP (Lightweight Directory Access Protocol)
 
-## 3.1 LDAP Nedir?
+### 3.1 LDAP Nedir?
 
 LDAP, uygulamaların kullanıcı bilgilerini hızlı bir şekilde sorgulamasına olanak tanıyan bir protokoldür. Şirketler kullanıcı adlarını, şifreleri, e-posta adreslerini, yazıcı bağlantılarını ve diğer statik verileri dizinlerde saklar. LDAP, bu verilere erişmek ve bunları yönetmek için kullanılan açık ve satıcıdan bağımsız bir uygulama protokolüdür.
 
@@ -156,7 +191,7 @@ LDAP bir protokol olduğu için dizin programlarının nasıl çalışacağını
 
 > **LDAP ve Active Directory ilişkisi:** LDAP, Active Directory'yi okuyabilen bir protokoldür. Bu nedenle ikisi kullanıcılara yardımcı olmak için birlikte çalışır. Ancak birbirleriyle rekabet etmezler ve tam olarak aynı şeyi yapmazlar: Active Directory dizin servisinin kendisidir, LDAP ise ona erişmek için kullanılan dildir.
 
-## 3.2 Dizinde Tutulan Veri Türleri
+### 3.2 Dizinde Tutulan Veri Türleri
 
 Bir dizinin içerdiği veriler genel olarak üç özelliğe sahiptir:
 
@@ -164,14 +199,14 @@ Bir dizinin içerdiği veriler genel olarak üç özelliğe sahiptir:
 - **Static (Statik):** Veriler sürekli değişmez, değiştiğinde de değişiklikler küçük ve nadirdir. Örneğin bir çalışanın adı, departmanı veya pozisyonu her gün değişmez.
 - **Valuable (Değerli):** Bu statik bilgiler temel iş fonksiyonları için kritiktir ve sürekli olarak okunur. Örneğin bir çalışan günde 10 farklı sisteme girdiğinde, bu sistemler saniyeler içinde defalarca LDAP'a *"Bu kişi doğru kişi mi?"* diye sorar.
 
-## 3.3 LDAP Nasıl Çalışır?
+### 3.3 LDAP Nasıl Çalışır?
 
-### Temel Bileşenler
+#### Temel Bileşenler
 
 - **LDAP Sunucusu (Directory System Agent - DSA):** Dizin hizmetini barındırır ve verileri **Directory Information Tree (DIT)** adı verilen hiyerarşik bir yapıda saklar. DIT; kullanıcılar, gruplar veya cihazlar gibi nesneleri temsil eden girişlerden oluşur. Her giriş, **Distinguished Name (DN)** ile benzersiz şekilde tanımlanır ve nesneyi tarif eden öznitelikler (attribute) içerir.
 - **LDAP İstemcisi:** Dizin girdilerini aramak, değiştirmek veya yönetmek için LDAP sunucusuna bağlanan uygulama ya da sistemdir.
 
-### Tipik Bir LDAP Sorgusu
+#### Tipik Bir LDAP Sorgusu
 
 1. İstemci, standart bir port (varsayılan olarak TCP 389 veya güvenli LDAPS için 636) üzerinden Active Directory sunucusuna ağ bağlantısı kurar.
 2. İstemci, dizine erişim yetkisi kazanmak için sunucuya kimlik doğrulama isteği (LDAP Bind) gönderir.
@@ -179,7 +214,7 @@ Bir dizinin içerdiği veriler genel olarak üç özelliğe sahiptir:
 4. Active Directory, hiyerarşik dizin veritabanında kriterlere uyan nesneleri arar ve elde ettiği sonuçları istemciye döner.
 5. İstemci, sunucuya oturumu sonlandırma isteği (LDAP Unbind) göndererek bağlantıyı kapatır.
 
-### Yapılabilecek İşlemler
+#### Yapılabilecek İşlemler
 
 LDAP ile dizin üzerinde şu işlemler yapılabilir:
 
@@ -189,7 +224,7 @@ LDAP ile dizin üzerinde şu işlemler yapılabilir:
 - İki girişi benzerlik veya farklılık açısından karşılaştırmak
 - Mevcut bir girişi değiştirmek
 
-## 3.4 LDAP'ta Kimlik Doğrulama: Bind
+### 3.4 LDAP'ta Kimlik Doğrulama: Bind
 
 LDAP dünyasında kimlik doğrulama (oturum açma) işlemine teknik olarak **"Bind" (Bağlanma)** denir. Bir uygulama veya kullanıcı, dizinde arama yapmadan önce sunucuya bir **Bind Request** gönderir. LDAP bu doğrulamayı temel olarak 3 farklı yöntemle yapar:
 
@@ -202,7 +237,7 @@ LDAP, kullanıcının parolasını düz metin olarak almak yerine daha güvenli 
 **3. Anonim Bağlantı (Anonymous Bind)**
 Kullanıcı adı veya parola istenmez, sistem herkese açıktır. Çok büyük bir güvenlik zafiyeti (bilgi sızdırma) yaratacağı için günümüz kurumsal ağlarında ve Active Directory yapılarında bu yöntem varsayılan olarak kapalıdır.
 
-## 3.5 LDAP'ın Avantajları
+### 3.5 LDAP'ın Avantajları
 
 - **Merkezi yönetim:** Kullanıcı hesapları, gruplar, cihazlar ve diğer nesneler gibi dizin bilgileri merkezi olarak yönetilir. Bu da yöneticilerin kurum genelinde tutarlılığı ve kontrolü sağlamasını kolaylaştırır.
 - **Ölçeklenebilirlik:** Büyük hacimli verileri ve çok sayıda okuma işlemini verimli şekilde işlemek üzere tasarlanmıştır. İşletmenin ihtiyaçlarıyla birlikte büyüyebildiği için küçük işletmelerden büyük işletmelere kadar her ölçekte kullanılabilir.
@@ -210,7 +245,7 @@ Kullanıcı adı veya parola istenmez, sistem herkese açıktır. Çok büyük b
 - **Geliştirilmiş güvenlik:** Kimlik doğrulama ve yetkilendirmeyi merkezileştirerek güvenliği artırır. İşletmeler LDAP ile tek oturum açma (SSO) sistemi uygulayarak yetkisiz erişim riskini azaltabilir.
 - **Azaltılmış karmaşıklık:** Hiyerarşik yapısı olan Directory Information Tree (DIT), verilerin düzenlenmesini basitleştirir; kullanıcıların ve uygulamaların bilgiyi bulmasını kolaylaştırır.
 
-## 3.6 LDAP'ın Dezavantajları
+### 3.6 LDAP'ın Dezavantajları
 
 - **Yazma performansı:** LDAP, dizin hizmetlerinde daha yaygın olan okuma işlemleri için optimize edilmiştir. Bu yüzden özellikle sık güncelleme yapılan büyük ortamlarda yazma işlemleri yavaşlayabilir.
 - **Karmaşıklık:** Esnek ve ölçeklenebilir olsa da hiyerarşik yapısı ve şeması, özellikle protokole aşina olmayan yöneticiler için kurulumu ve bakımı zorlaştırabilir.
@@ -221,9 +256,9 @@ Kullanıcı adı veya parola istenmez, sistem herkese açıktır. Çok büyük b
 
 ---
 
-# 4. Kerberos
+## 4. Kerberos
 
-## 4.1 Kerberos Nedir?
+### 4.1 Kerberos Nedir?
 
 Kerberos, ağ güvenliğini sağlamak amacıyla Massachusetts Teknoloji Enstitüsü (MIT) tarafından Athena Projesi için geliştirilmiş bir kimlik doğrulama protokolüdür. Ağ üzerinden parola göndermeden, biletleme mantığıyla kimlik doğrulamayı mümkün kılar.
 
@@ -233,7 +268,7 @@ Protokolün güncel sürümü (**Kerberos V5**), iletişimi güvence altına alm
 
 ![Cerberus](Images/Cerberus.png)
 
-## 4.2 Temel Terimler
+### 4.2 Temel Terimler
 
 * **Kerberos Realm (Kerberos Etki Alanı):** Kapalı bir şirket ağındaki yetki bölgesi olarak düşünülebilir. Kerberos'un belirli servislere veya uygulamalara erişim için kullanıcı kimliğini doğrulayabildiği sistem sınırıdır. Bu alanda bulunan her varlığın ait olduğu yer DNS adı ile tanımlanır.
 * **Application Server (Uygulama Sunucusu):** Kerberos etki alanı içinde dosyalara veya servislere erişmek isteyen istemcilerden kimlik doğrulaması şart koşan sistemlerdir.
@@ -265,7 +300,7 @@ Protokolün güncel sürümü (**Kerberos V5**), iletişimi güvence altına alm
 
 <small>Kaynak: https://www.researchgate.net/figure/Kerberos-Authentication-Architecture_fig1_2489765</small>
 
-## 4.3 Kerberos Kimlik Doğrulama Süreci Nasıl Çalışır?
+### 4.3 Kerberos Kimlik Doğrulama Süreci Nasıl Çalışır?
 
 Kerberos süreci temel olarak üç aşamadan oluşur:
 
@@ -273,35 +308,35 @@ Kerberos süreci temel olarak üç aşamadan oluşur:
 
 <small>Kaynak: https://www.upguard.com/blog/kerberos-authentication</small>
 
-### 1. Aşama: Kimlik Doğrulama Sunucusu (AS) ile İletişim
+#### 1. Aşama: Kimlik Doğrulama Sunucusu (AS) ile İletişim
 1. İstemci, Kimlik Doğrulama Sunucusuna (AS) kendi kullanıcı adını içeren düz metin bir giriş isteği gönderir. (Parola bu adımda ağa gönderilmez.)
 2. AS, veritabanında kullanıcının var olup olmadığını kontrol eder. Kullanıcı geçerliyse kullanıcının parolasının özetinden (hash) bir anahtar türetir.
 3. AS, istemciye iki mesaj gönderir: Biri KDC'nin gizli anahtarıyla şifrelenmiş **TGT**, diğeri ise kullanıcının kendi parolasından türetilen anahtarla çözebileceği bir **Oturum Anahtarı (Session Key)**.
 4. İstemci kendi parolasını girerek oturum anahtarını çözer ve sistemde güvenilir bir varlık olduğunu kanıtlar.
 
-### 2. Aşama: Bilet Veren Sunucu (TGS) ile İletişim
+#### 2. Aşama: Bilet Veren Sunucu (TGS) ile İletişim
 5. İstemci ağdaki belirli bir servise (örneğin bir dosya sunucusuna) erişmek istediğinde elindeki TGT'yi ve o an oluşturduğu Doğrulayıcı Mesajı (Authenticator) TGS'ye gönderir.
 6. TGS, TGT'yi çözer ve içindeki bilgilerle Doğrulayıcı Mesajı karşılaştırır. Kimlik ve zaman damgası eşleşiyorsa işlem onaylanır.
 7. TGS, istemciye o spesifik servis için kullanabileceği yeni bir **Servis Bileti (ST)** gönderir.
 
-### 3. Aşama: Uygulama Sunucusu ile İletişim
+#### 3. Aşama: Uygulama Sunucusu ile İletişim
 8. İstemci, TGS'den aldığı ST'yi ve yeni oluşturduğu bir Doğrulayıcı Mesajı doğrudan hedef Uygulama Sunucusuna gönderir.
 9. Uygulama Sunucusu bileti çözer ve doğrulama işlemlerini gerçekleştirir. Başarılı olursa istemcinin servise erişimine izin verir. Karşılıklı kimlik doğrulama isteniyorsa sunucu da istemciye bir onay mesajı döndürebilir.
 
 > **Önemli kural:** Kerberos'ta parolalar ağ üzerinden asla düz metin olarak paylaşılmaz; her adımda biletler ve geçici oturum anahtarları konuşur.
 
-## 4.4 Kullanım Yerleri
+### 4.4 Kullanım Yerleri
 
 ![Cerberus Kullanım Yerleri](Images/Cerberus%20Kullan%C4%B1m%20Yerleri.png)
 
-## 4.5 Avantajları
+### 4.5 Avantajları
 
 * **Tekli Oturum Açma (SSO):** Kullanıcıların tek bir oturum açma işlemiyle yetkili oldukları tüm hizmetlere erişmesini sağlar. Tekrar tekrar giriş yapmaya gerek kalmaz; bir kez giriş yapmak, gün boyu yetkili olunan her yere doğrudan erişmek için yeterlidir. Her uygulamaya girerken parola yazılmadığı ve asıl parola ağ üzerinden gönderilmediği için parolanın ele geçirilme riski de azalır.
 * **Siber güvenlik:** Güçlü şifreleme, kriptografi ve güvenilir üçüncü taraf yetkilendirmesi kullanması, siber saldırıları önlemek için veri güvenliğini güçlendirir.
 * **Karşılıklı kimlik doğrulama:** Hem kullanıcının hem de hizmetin birbirini doğrulamasına olanak tanır; böylece iki tarafın da gerçek olduğundan emin olunur.
 * **Erişim kontrolü:** Erişim izinleri verilmeden önce güvenlik politikalarının karşılandığından emin olmak için kimlik doğrulama yapar ve erişim kontrolünü kolaylaştırır.
 
-## 4.6 Dezavantajları ve Zayıf Noktaları
+### 4.6 Dezavantajları ve Zayıf Noktaları
 
 * **Yaygın bir saldırı vektörü olması:** Protokolün uzun süredir var olması ve çok yaygın kullanılması, onu siber suçlular için popüler ve bilindik bir hedef haline getirir.
 * **Sürekli izleme zorunluluğu:** Kusursuz bir yapıya sahip olmadığı için kuruluşların saldırı yüzeylerini sürekli izlemesi ve yönetmesi gerekir.
