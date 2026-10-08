@@ -1,5 +1,20 @@
-# Rest API
-## API ve RESTful Mimarisi
+# REST API ve HTTP
+
+## İçindekiler
+
+- [REST API](#rest-api)
+  - [API, Web API ve REST Nedir?](#api-web-api-ve-rest-nedir)
+  - [REST Mimarisinin Temel Prensipleri](#rest-mimarisinin-temel-prensipleri)
+  - [RESTful Servis](#restful-servis)
+- [HTTP](#http)
+  - [HTTP Metotları](#http-metotları)
+  - [Klasik Bir GET Sorgusu Örneği](#klasik-bir-get-sorgusu-örneği)
+
+---
+
+## REST API
+
+### API, Web API ve REST Nedir?
 * **API (Application Programming Interface - Uygulama Programlama Arayüzü):** Farklı uygularamaların, yazılımların veya cihazların birbirine nasıl bağlanabileceğini ve birbiriyle
 nasıl iletişim kuracağını tanımlayan kurallar bütünüdür.
 
@@ -31,14 +46,20 @@ Kaynak sunucu tarafından bir yanıtın önbelleğe alınıp alınamayacağını
 🔹 **Code on Demand (İsteğe Bağlı Kod):** Opsiyonel bir kuraldır. Sunucunun istemciye çalıştırabileceği bir komut dosyası (kod) göndermesine olanak tanır.
 
 ----------
+
+### RESTful Servis
+
 * **RESTful Servis:** Yukarıdaki REST mimari prensiplerinin tümünü eksiksiz uygulayan servislere verilen addır. Popüler örneklere Twilio, Stripe ve Google Maps API servisleri gösterilebilir.
 
 ![Rest API](https://images.ctfassets.net/vwq10xzbe6iz/5sBH4Agl614xM7exeLsTo7/9e84dce01735f155911e611c42c9793f/rest-api.png)
 
-# HTTP 
+---
+
+## HTTP
 HTTP (Hypertext Transfer Protocol - Köprü Metni Aktarım Protokolü), bir web tarayıcısı ile bir web sunucusu arasındaki iletişimi sağlayan bir protokoldür. İstemci-sunucu (Client-Server) mantığıyla çalışır.
 İstek doğrultusunda sunucudan gelen HTML, CSS, JavaScript, JSON ve XML dosyalarının istemci/kullanıcı cihazında işlenmesini, çalıştırılmasını ve görüntülenmesini sağlar.
-## HTTP Metotları 
+
+### HTTP Metotları
 
 * **GET :** Belirtilen URL'deki kaynağı almak için kullanılır. Yalnızca okuma yapar, veride herhangi bir değişikliğe gitmez; bu nedenden dolayı önbelleklenebilir (cacheable).
 * **HEAD :** GET ile aynı mantıkta çalışır fakat yanıtta Body (veri bloğu / JSON vb.) dönmez; yalnızca Header bilgileri (içerik türü, dosya boyutu, yetkilendirme durumu vb.) döner. Kaynağın varlığını veya en son ne zaman değiştirildiğini (Last-Modified) kontrol etmek için kullanılır.
@@ -54,6 +75,8 @@ HTTP (Hypertext Transfer Protocol - Köprü Metni Aktarım Protokolü), bir web 
 | • Url boyut sınırlamaları (8000 maksimum karakter kullanımı) ve karmaşık sorgular oluşturmanın zorluğu<br><br/>• Parametrelerin loglarda görünmesi bir güvenlik sorunu olarak açığa çıkar. | • Ağ bağlantısı kesilirse, istek güvenli bir şekilde yeniden gönderilemez. (POST İdempotent değildir)<br><br/>• Standart http önbelleklemesi (cache) yok |
 
 QUERY sayesinde ağ bağlantısı kesilse dahi veride herhangibir bozulma olmadan ilgili isteği tekrar gönderebiliriz. Ayrıca karmaşık sorguların request body içerisinde gönderilebilmesi sayesinde URL uzunluğu sınırlamalarının ve sorgu parametrelerinin URL üzerinde açıkça görünmesinin önüne geçilmesi amaçlanır. Bu sayede özellikle büyük ve karmaşık sorguların daha uygun bir şekilde sunucuya iletilmesi sağlanır.
+
+### Klasik Bir GET Sorgusu Örneği
 
 ![HTTPS Requst](https://www.cloud4y.ru/upload/medialibrary/4c0/hn5x5w7tx2pa0t3m1us71vh51dthf4kg/2.jpg)
 Yukarıda klasik bir GET sorgusunun örneği verilmiştir.
