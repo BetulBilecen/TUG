@@ -1,4 +1,27 @@
-# Command Query Responsibility Segregation (CQRS)
+# CQRS ve Mediator
+
+---
+
+## İçindekiler
+
+1. [Command Query Responsibility Segregation (CQRS)](#1-command-query-responsibility-segregation-cqrs)
+   - [1.1 CQS: Command Query Separation](#11-cqs-command-query-separation)
+   - [1.2 CQRS nedir?](#12-cqrs-nedir)
+   - [1.3 CQRS ve Geleneksel CRUD Yaklaşımları Arasındaki Farklar](#13-cqrs-ve-geleneksel-crud-yaklaşımları-arasındaki-farklar)
+   - [1.4 CQRS Avantajları](#14-cqrs-avantajları)
+   - [1.5 CQRS'in Dezavantajları](#15-cqrsin-dezavantajları)
+2. [Mediator](#2-mediator)
+   - [2.1 Mediator nedir?](#21-mediator-nedir)
+   - [2.2 Avantajları](#22-avantajları)
+   - [2.3 Dezavantajları](#23-dezavantajları)
+
+**Ek:** [Kaynakça](#kaynakça)
+
+---
+
+## 1. Command Query Responsibility Segregation (CQRS)
+
+### 1.1 CQS: Command Query Separation
 
 CQRS'yi anlatmadan önce, temelini oluşturan CQS (Command Query Separation) prensibine değinmemiz gerekir.
 
@@ -6,7 +29,7 @@ CQS, bir metodun iki farklı rolden yalnızca birini üstlenmesi gerektiğini sa
 
 Bu iki rol:
 - **Command:** İlgili sistemin durumunda değişiklik yapar. Örneğin yeni veri eklemek veya var olan veri üzerinde güncelleme yapmak için kullanılır (Insert, Update, Delete).
-````markdown
+
 ```csharp
 using CQRS.Data;
 using CQRS.Models;
@@ -33,11 +56,12 @@ namespace CQRS.Commands
         }
     }
 }
-````
+```
 
 Bu kodda `UpdateOrderCommandHandler`, `UpdateOrderCommand` içerisindeki `Id` değerine göre ilgili siparişi bulur. Sipariş bulunursa `Product` ve `Quantity` değerlerini günceller. **Veritabanındaki mevcut veriyi değiştirdiği için Command işlemini gerçekleştirir.**
 
 - **Query:** İlgili sistemin mevcut durumunu değiştirmeden bilgi almak için kullanılan işlemdir. Genellikle veritabanı veya başka bir veri kaynağından bilgi döndürür.
+
 ```csharp
 using System;
 using System.Collections.Generic;
@@ -57,7 +81,10 @@ namespace CQRS.Queries
     }
 }
 ```
+
 ---
+
+### 1.2 CQRS nedir?
 
 [![CQRS Mimari Şeması](./Images/CQRS%20Nedir.png)](https://sefikcankanber.medium.com/cqrs-command-query-responsibility-segregation-nedir-16b196376389)
 *Görsel Kaynağı: [Şefik Can Kanber (Medium)](https://sefikcankanber.medium.com/cqrs-command-query-responsibility-segregation-nedir-16b196376389)*
@@ -70,7 +97,7 @@ CQRS'nin önemli avantajlarından biri de okuma işlemlerinin ihtiyaç duyduğu 
 
 Bu nedenlerden ötürü karmaşık ve büyük ölçekli sistemlerde okuma ve yazma işlemlerinin tek bir model üzerinden yürütülmesi; performans, ölçeklenebilirlik ve esneklik açısından ciddi darboğazlar yaratır. Bu nedenle CQRS (Command Query Responsibility Segregation) mimarisi tercih edilir.
 
-## CQRS ve Geleneksel CRUD Yaklaşımları Arasındaki Farklar
+### 1.3 CQRS ve Geleneksel CRUD Yaklaşımları Arasındaki Farklar
 
 | Geleneksel CRUD | CQRS |
 |---|---|
@@ -85,7 +112,8 @@ Bu nedenlerden ötürü karmaşık ve büyük ölçekli sistemlerde okuma ve yaz
 
 [![CRUD vs CQRS Mimari Şeması](./Images/CRUD-VS.-CQRS.jpg)](https://anarsolutions.com/microservices-development-patterns-crud-vs-cqrs/)
 
-## CQRS Avantajları
+### 1.4 CQRS Avantajları
+
 - Yazma işlemleri için normalleştirilmiş, okuma işlemleri için denormalize edilmiş yapılar tercih edilebilir.
 - Okuma modelinde Cache ve Materialized View gibi teknikler kullanılarak sorgu performansı artırılabilir. Cache, sık kullanılan verilerin hızlı bir şekilde erişilebilmesi için saklanmasını sağlarken, Materialized View karmaşık sorguların önceden hesaplanmış sonuçlarını fiziksel olarak saklayarak sorguların tekrar tekrar hesaplanmasını önleyebilir.
 - Command ve Query tarafları, yatay ölçeklendirme sayesinde farklı sunucularda veya veri merkezlerinde çalıştırılabilir. Böylece okuma ve yazma yükleri birbirinden bağımsız olarak ölçeklendirilebilir ve sistem yükünün dengelenmesine yardımcı olunabilir.
@@ -138,14 +166,18 @@ Bu nedenlerden ötürü karmaşık ve büyük ölçekli sistemlerde okuma ve yaz
 - Query ve Command tarafları birbirlerinden ayrıldığı için farklı kimlik doğrulama (authentication) ve yetkilendirme (authorization) politikalarının uygulanması kolaylaşabilir. Örneğin CREATE, UPDATE ve DELETE işlemleri yalnızca belirli rollere açıkken, bazı READ işlemleri daha geniş bir kullanıcı grubuna sunulabilir.
 - CQRS, Event Sourcing ile birlikte kullanılabilir. Event Sourcing kullanılan sistemlerde gerçekleştirilen değişiklikler olaylar (Event) olarak saklanarak sistemin geçmiş durumunun yeniden oluşturulmasına olanak sağlayabilir.
 
-## CQRS'in Dezavantajları
+### 1.5 CQRS'in Dezavantajları
+
 - Büyük sistemlerde hem command hem de query modellerinin geliştirilmesi ve bakımı ekstra iş yükü getirir.
 - Küçük sistemlerde, yani basit CRUD operasyonlarının yeterli olduğu projelerde, CQRS ek bir karmaşıklık katmanı olarak algılanabilir.
 - CQRS, klasik CRUD'dan daha fazla kavram ve farklı bir düşünme biçimi gerektirdiği için geliştiricinin sisteme ve kullanılan desenlere alışması zaman alabilir.
 
 ---
 
-# Mediator
+## 2. Mediator
+
+### 2.1 Mediator nedir?
+
 ![Mediator Design Pattern - Kaotik vs Merkezi Yönetim](/Images/Mediator.jpg)
 
 Mediator, çok sayıda nesnenin bulunduğu sistemlerde nesnelerin birbirleriyle doğrudan iletişim kurmasını azaltmak ve aralarındaki bağımlılığı en aza indirmek amacıyla kullanılan bir davranışsal (Behavioral) tasarım desenidir.
@@ -165,7 +197,7 @@ Mediator kullanıldığında ise:
 
 Nesneler iletişim kurmak istediklerinde doğrudan birbirlerine başvurmak yerine Mediator'a başvurur. Mediator ise gelen iletişimi ilgili nesneye yönlendirir.
 
-## Avantajları
+### 2.2 Avantajları
 
 * Nesneler arasındaki doğrudan bağımlılıkları azaltır. Nesneler arasındaki daha az bağımlılık, bu nesnelerin farklı yerlerde kullanılmasını kolaylaştırabilir.
 * Sınıflar arasındaki iletişimi daha merkezi ve düzenli hale getirir.
@@ -176,10 +208,13 @@ Nesneler iletişim kurmak istediklerinde doğrudan birbirlerine başvurmak yerin
 * İstemci sınıfının kendi sorumluluğuna odaklanmasına yardımcı olur. İstemcinin diğer nesneleri doğrudan çağırması için gereken kodlamaları ve referansları azaltabilir.
 * Open/Closed Principle'a uyumu destekleyebilir. Mediator'a yeni iletişim senaryolarının eklenmesi, mevcut kodlarda değişiklik yapma ihtiyacını azaltabilir.
 
-## Dezavanatjları
+### 2.3 Dezavantajları
+
 - Sistem büyüdükçe mediator her şeyi yapan, aşırı büyümüş bir sınıfa "God Class" dönüşebilir.
 - Doğrudan çağrının yeterli olduğu basit sistemlerde Mediator ve Handler gibi ek katmanlar debugging (hata ayıklama) sürecini zorlaştırabilir.
 - Çok sayıda Command, Query ve Handler oluşturulması, özellikle küçük projelerde gereksiz karmaşıklığa neden olabilir.
+
+---
 
 ## Kaynakça
 
