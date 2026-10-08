@@ -1,5 +1,19 @@
 # ORM (Object-Relational Mapping)
 
+## İçindekiler
+
+- [ORM Nedir?](#orm-nedir)
+- [Veritabanı Bağlantısı ve Yönetimi](#veritabanı-bağlantısı-ve-yönetimi)
+- [Object-Relational Impedance Mismatch](#object-relational-impedance-mismatch)
+  - [Temel Uyuşmazlıklar](#temel-uyuşmazlıklar)
+  - [Kalıtım Sorununa Çözüm Yöntemleri](#kalıtım-sorununa-çözüm-yöntemleri)
+- [ORM Mimarileri](#orm-mimarileri)
+- [Lazy Loading ve Eager Loading](#lazy-loading-ve-eager-loading)
+  - [N+1 Problemi](#n1-problemi)
+- [Bulk Operations](#bulk-operations)
+
+---
+
 ## ORM Nedir?
 
 Object-Relational Mapping (ORM), ilişkisel veritabanları (MySQL, MSSQL, SQLite vb.) ile nesne yönelimli programlama (OOP) dilleri arasında bir köprü görevi görür.
@@ -98,12 +112,14 @@ Nesne yönelimli programlama dillerinin veriyi ele alış biçimi ile ilişkisel
 
 OOP dünyasında veriler nesneler, sınıflar, referanslar ve davranışlar etrafında, yani pointer'lar ve adresler üzerinden şekillenirken; ilişkisel veritabanlarında tablolar, satırlar, sütunlar ve yabancı anahtarlar (foreign keys) esastır.
 
-#### Temel Uyuşmazlıklar
+### Temel Uyuşmazlıklar
 
 - **Inheritance (Kalıtım):** Nesne yönelimli programlamada sınıflar birbirinden türeyebilir. Ancak ilişkisel veritabanlarında bunun doğrudan bir karşılığı yoktur; tablolar arasında yalnızca anahtar (primary key) ilişkileri kurulur. Bu sorunu çözmek için Single Table ve Joined Table yöntemleri kullanılır.
 - **İlişkiler ve Referanslar:** Nesne yönelimli programlamada bir nesne, bellekteki bir referansı veya adresi işaret eder. İlişkisel veritabanında ise manuel olarak oluşturulan ID'ler ile tablolar arasındaki bağlantılar sağlanır.
 - **Nesne ve Kayıt Kimliği:** Nesne yönelimli programlamada aynı adresi belirten birden fazla değişken olabilir (`a == b`). İlişkisel veritabanında ise bir kaydın kimliği primary key'e bağlıdır. Bu nedenle aynı veritabanı satırını temsil eden birden fazla bellek nesnesi olabilir. Bu durum senkronizasyon sorunlarının ortaya çıkmasına sebep olabilir.
 - **Encapsulation (Kapsülleme):** Nesne yönelimli programlamada nesneler, metotlarla veriyi sarmalar. Veritabanı ise davranıştan habersiz, yalnızca pasif tablolar tutar.
+
+### Kalıtım Sorununa Çözüm Yöntemleri
 
 **Single Table:** Yazılan tüm sınıflar (SQL'deki tablolar) tek bir tablo altında birleştirilir. İlgili verileri ayırmak için `type` tarzı bir alan eklenir ve ortak olmayan özellikler NULL olarak kalır. Hızlı bir çözümdür; ancak alt sınıflara ulaşmak, veri modeli zenginleştikçe ve karmaşıklaştıkça daha zor hâle gelir.
 
@@ -138,6 +154,8 @@ session.delete(User)
 **Lazy Loading:** Nesne ve sınıfları oluşturduğumuzu düşünelim. Veritabanına erişimimiz de mevcut olsun. İlgili nesne üzerinde işlem yapılana kadar veriler veritabanından çekilmez. Bu işlemler, ilgili özellik veya ilişkiye erişildiğinde gerçekleştirilir.
 
 **Eager Loading:** Lazy Loading'in tam tersi olarak, ilişkili veriler nesneler oluşturulurken veya sorgu çalıştırılırken veritabanından alınır.
+
+### N+1 Problemi
 
 Bu ikisi arasındaki farkı N+1 problemi ile daha iyi gözlemleyebiliriz.
 
