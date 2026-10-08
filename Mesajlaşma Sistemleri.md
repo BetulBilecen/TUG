@@ -1,8 +1,37 @@
 # Mesajlaşma Sistemleri
 
+## İçindekiler
+
+- [Temel Kavramlar](#temel-kavramlar)
+  - [Asenkron ve Senkron Mesajlaşma](#asenkron-ve-senkron-mesajlaşma)
+  - [Message (Mesaj) Nedir?](#message-mesaj-nedir)
+  - [Queue Nedir?](#queue-nedir)
+  - [Message Queue Nedir?](#message-queue-nedir)
+  - [Message Broker Nedir?](#message-broker-nedir)
+- [Message Broker Teknolojileri](#message-broker-teknolojileri)
+  - [RabbitMQ](#rabbitmq)
+  - [Apache Kafka](#apache-kafka)
+  - [Apache Pulsar](#apache-pulsar)
+  - [ActiveMQ](#activemq)
+  - [NATS](#nats)
+  - [Amazon SQS](#amazon-sqs)
+  - [Amazon SNS](#amazon-sns)
+  - [Google Cloud Pub/Sub](#google-cloud-pubsub)
+  - [Azure Service Bus](#azure-service-bus)
+  - [Redis Streams](#redis-streams)
+- [Mesajlaşma Modelleri](#mesajlaşma-modelleri)
+  - [Point-to-Point (Birebir)](#point-to-point-birebir)
+  - [Publish/Subscribe (Yayınla/Abone Ol)](#publishsubscribe-yayınlaabone-ol)
+  - [Özet](#özet)
+  - [Push ve Pull Modeli](#push-ve-pull-modeli)
+- [Genel Karşılaştırma](#genel-karşılaştırma)
+- [Kaynakça](#kaynakça)
+
+---
+
 ## Temel Kavramlar
 
-### Asenkron ve Senkron İletişim
+### Asenkron ve Senkron Mesajlaşma
 
 **Senkron İletişim:** Gönderici ile alıcının iletişim sırasında eş zamanlı olarak etkileşimde bulunduğu iletişim şeklidir. Gönderici mesajı veya isteği gönderdiğinde alıcının vereceği yanıtı bekler. Bu bekleme sırasında gönderici ilgili işleme devam edemez ve işlem **bloklanır**. Alıcı yanıt verdiğinde ise gönderici beklediği yerden işlemine devam eder.
 
@@ -305,7 +334,7 @@ Mesajların ilgili Queue'ya gitmesi için gereken yönlendirmeyi routing key ile
 
 <small>*Görsel Kaynağı: [Rahul P Nath — RabbitMQ Headers Exchange](https://www.rahulpnath.com/blog/headers-exchange-rabbitmq-dotnet)*</small>
 
-#### ACK ve Mesaj İşleme
+#### ACK ve Mesaj Onaylama
 
 Burada amaç, Consumer mesajı Queue'dan aldıktan sonra RabbitMQ'nun mesajın başarıyla işlenip işlenmediğini takip edebilmesidir.
 
@@ -620,7 +649,7 @@ Subscriber'lar bu Subject'lere joker karakterlerle abone olabilir:
 - `*` → Tek bir seviyeyi karşılar. Örneğin `orders.*`, `orders.created` ve `orders.cancelled`'ı yakalar; `orders.us.created`'ı yakalamaz.
 - `>` → Kendisinden sonraki tüm seviyeleri karşılar. Örneğin `orders.>`, `orders.created` ve `orders.us.created` dahil hepsini yakalar.
 
-#### Temel İletişim Modelleri
+#### NATS'ta Temel Modeller
 
 - **Publish/Subscribe:** Bir Publisher mesajı bir Subject'e yayınlar, o Subject'i dinleyen tüm Subscriber'lar mesajı alır.
 - **Request/Reply:** Bir istemci mesaj gönderip cevap bekler; NATS bu senkron benzeri iletişimi de yerleşik olarak destekler.
@@ -774,7 +803,7 @@ RabbitMQ ve Kafka gibi sistemlerden farklı olarak Redis Streams, bağımsız bi
 
 ---
 
-## İletişim Modelleri
+## Mesajlaşma Modelleri
 
 Mesajlaşma sistemlerinde mesajların Producer'dan Consumer'lara nasıl dağıtılacağını belirleyen farklı iletişim modelleri bulunur.
 
