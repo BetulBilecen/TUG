@@ -4,6 +4,117 @@ Bu doküman; etcd, Consul, ZooKeeper, Kubernetes ConfigMap/Secret, Spring Cloud 
 
 ---
 
+## İçindekiler
+
+**Giriş**
+- [Bu araçlara neden ihtiyacımız var?](#bu-araçlara-neden-ihtiyacımız-var)
+- [Dağıtık sistem nedir?](#dağıtık-sistem-nedir)
+- [Konfigürasyon nedir?](#konfigürasyon-nedir)
+- [Secret nedir? Secret yönetimi nedir?](#secret-nedir-secret-yönetimi-nedir)
+- [Konfigürasyon ile secret arasındaki fark](#konfigürasyon-ile-secret-arasındaki-fark)
+
+**A. Koordinasyon ve servis keşfi**
+
+1. [etcd](#1-etcd)
+   - [1.1 Genel bakış](#11-genel-bakış)
+   - [1.2 Temel özellikleri](#12-temel-özellikleri)
+   - [1.3 Raft algoritması](#13-raft-algoritması)
+   - [1.4 Lider seçimi](#14-lider-seçimi)
+   - [1.5 Disk ve performans](#15-disk-ve-performans)
+   - [1.6 etcd ve Kubernetes](#16-etcd-ve-kubernetes)
+   - [1.7 etcd'yi kimler kullanır?](#17-etcdyi-kimler-kullanır)
+   - [1.8 Özet tablo](#18-özet-tablo)
+2. [Consul](#2-consul)
+   - [2.1 Genel bakış](#21-genel-bakış)
+   - [2.2 Consul ile etcd/benzeri araçlar arasındaki fark](#22-consul-ile-etcdbenzeri-araçlar-arasındaki-fark)
+   - [2.3 Servis discovery: servise nasıl ulaşılır?](#23-servis-discovery-servise-nasıl-ulaşılır)
+   - [2.4 Consul'un özellikleri](#24-consulun-özellikleri)
+   - [2.5 Consul cluster mimarisi](#25-consul-cluster-mimarisi)
+   - [2.6 Consul Agent](#26-consul-agent)
+   - [2.7 Önemli ayrım: state kimde?](#27-önemli-ayrım-state-kimde)
+   - [2.8 Özet](#28-özet)
+3. [Apache ZooKeeper](#3-apache-zookeeper)
+   - [3.1 Apache ZooKeeper nedir?](#31-apache-zookeeper-nedir)
+   - [3.2 Mimari yapı](#32-mimari-yapı)
+   - [3.3 Veri modeli: znode kavramı](#33-veri-modeli-znode-kavramı)
+   - [3.4 Znode türleri](#34-znode-türleri)
+   - [3.5 Avantajları ve kullanım alanları](#35-avantajları-ve-kullanım-alanları)
+   - [3.6 Lider seçimi](#36-lider-seçimi)
+   - [3.7 2026 yılında tespit edilen güvenlik açıkları](#37-2026-yılında-tespit-edilen-güvenlik-açıkları)
+
+**B. Kubernetes'te konfigürasyon ve secret**
+
+4. [Kubernetes ConfigMap, Pod, Deployment ve HPA](#4-kubernetes-configmap-pod-deployment-ve-hpa)
+   - [4.1 ConfigMap nedir?](#41-configmap-nedir)
+   - [4.2 ConfigMap verilerinin kullanılması](#42-configmap-verilerinin-kullanılması)
+   - [4.3 Pod](#43-pod)
+   - [4.4 Kubernetes Deployment](#44-kubernetes-deployment)
+   - [4.5 Deployment ve ConfigMap birlikte nasıl çalışır?](#45-deployment-ve-configmap-birlikte-nasıl-çalışır)
+   - [4.6 Kullanıcı isteği geldiğinde ne olur?](#46-kullanıcı-isteği-geldiğinde-ne-olur)
+   - [4.7 Replica sayısının güncellenmesi](#47-replica-sayısının-güncellenmesi)
+   - [4.8 HPA (Horizontal Pod Autoscaler)](#48-hpa-horizontal-pod-autoscaler)
+5. [Kubernetes Secret](#5-kubernetes-secret)
+   - [5.1 Kubernetes Secret nedir?](#51-kubernetes-secret-nedir)
+   - [5.2 Kim tarafından, ne amaçla geliştirildi?](#52-kim-tarafından-ne-amaçla-geliştirildi)
+   - [5.3 Secret nasıl kullanılır?](#53-secret-nasıl-kullanılır)
+   - [5.4 Secret'lar nerede saklanır?](#54-secretlar-nerede-saklanır)
+   - [5.5 `data` ve `stringData` farkı](#55-data-ve-stringdata-farkı)
+   - [5.6 ConfigMap'e göre güvenlik avantajı: RBAC](#56-configmape-göre-güvenlik-avantajı-rbac)
+   - [5.7 etcd'de encryption at rest](#57-etcdde-encryption-at-rest)
+
+**C. Uygulama seviyesinde konfigürasyon**
+
+6. [Spring Cloud Config](#6-spring-cloud-config)
+   - [6.1 Neden ihtiyaç var?](#61-neden-ihtiyaç-var)
+   - [6.2 Spring Cloud Config Server nedir?](#62-spring-cloud-config-server-nedir)
+   - [6.3 Nasıl çalışır?](#63-nasıl-çalışır)
+   - [6.4 Ön bilgi: Bean nedir?](#64-ön-bilgi-bean-nedir)
+   - [6.5 Çalışma anında yapılandırmayı yenileme](#65-çalışma-anında-yapılandırmayı-yenileme)
+   - [6.6 Client'ın Config Server'ı bulma yöntemleri](#66-clientın-config-serverı-bulma-yöntemleri)
+   - [6.7 Kubernetes kullanılıyorsa?](#67-kubernetes-kullanılıyorsa)
+
+**D. Secret yönetimi**
+
+7. [HashiCorp Vault](#7-hashicorp-vault)
+   - [7.1 Vault nedir?](#71-vault-nedir)
+   - [7.2 Kim tarafından, ne zaman geliştirildi?](#72-kim-tarafından-ne-zaman-geliştirildi)
+   - [7.3 Temel özellikleri](#73-temel-özellikleri)
+   - [7.4 Dinamik gizli bilgiler nasıl çalışır?](#74-dinamik-gizli-bilgiler-nasıl-çalışır)
+   - [7.5 Sızıntı problemi ve dinamik gizli bilgiler](#75-sızıntı-problemi-ve-dinamik-gizli-bilgiler)
+   - [7.6 Entegrasyonlar](#76-entegrasyonlar)
+   - [7.7 Nasıl çalışır?](#77-nasıl-çalışır)
+   - [7.8 Depolama](#78-depolama)
+8. [AWS Secrets Manager](#8-aws-secrets-manager)
+   - [8.1 AWS Secrets Manager nedir?](#81-aws-secrets-manager-nedir)
+   - [8.2 Temel özellikleri](#82-temel-özellikleri)
+   - [8.3 Nasıl çalışır?](#83-nasıl-çalışır)
+   - [8.4 Fiyatlandırma](#84-fiyatlandırma)
+   - [8.5 HashiCorp Vault ile fark](#85-hashicorp-vault-ile-fark)
+   - [8.6 Parameter Store ile fark](#86-parameter-store-ile-fark)
+   - [8.7 Spring Cloud Config ile ilişkisi](#87-spring-cloud-config-ile-ilişkisi)
+9. [AWS Parameter Store](#9-aws-parameter-store)
+   - [9.1 AWS Parameter Store nedir?](#91-aws-parameter-store-nedir)
+   - [9.2 Temel özellikleri](#92-temel-özellikleri)
+   - [9.3 Avantajları](#93-avantajları)
+   - [9.4 Standart ve gelişmiş (Advanced) katman](#94-standart-ve-gelişmiş-advanced-katman)
+   - [9.5 Nasıl çalışır?](#95-nasıl-çalışır)
+   - [9.6 Fiyatlandırma](#96-fiyatlandırma)
+   - [9.7 Secrets Manager ile fark](#97-secrets-manager-ile-fark)
+   - [9.8 Spring ile ilişkisi](#98-spring-ile-ilişkisi)
+10. [Google Cloud Secret Manager](#10-google-cloud-secret-manager)
+    - [10.1 Secret Version (gizli bilgi sürümleri)](#101-secret-version-gizli-bilgi-sürümleri)
+    - [10.2 Encryption (şifreleme)](#102-encryption-şifreleme)
+    - [10.3 IAM (Identity and Access Management)](#103-iam-identity-and-access-management)
+    - [10.4 Replication (çoğaltma)](#104-replication-çoğaltma)
+    - [10.5 Secret Manager ile etcd ve Consul'un birlikte kullanılması](#105-secret-manager-ile-etcd-ve-consulun-birlikte-kullanılması)
+
+**Ek:** [Kaynakça](#kaynakça)
+
+
+> 💡 **Raft** algoritması bu dokümanda birkaç yerde karşımıza çıkar. Ayrıntılı anlatımı [etcd](#1-etcd) bölümündedir; [Consul](#2-consul) ve [Vault](#7-hashicorp-vault) da Raft kullanır.
+
+---
+
 ## Bu araçlara neden ihtiyacımız var?
 
 Tek bir makinede çalışan basit bir uygulamanın ayarları bir dosyada durabilir. Ancak uygulama onlarca mikroservise ve yüzlerce makineye bölündüğünde şu sorular ortaya çıkar:
@@ -47,34 +158,6 @@ Dokümanın ana eksenlerinden biri bu ayrımdır:
 | Sızarsa | Genellikle sorun olmaz | Saldırgan bizim yerimize sisteme girebilir |
 | Uygun araçlar | etcd, Consul, ZooKeeper, ConfigMap, Spring Cloud Config, Parameter Store | Vault, Secrets Manager, GCP Secret Manager, Kubernetes Secret |
 
-### İçindekiler
-
-**A. Koordinasyon ve servis keşfi**
-1. [etcd](#1-etcd)
-2. [Consul](#2-consul)
-3. [Apache ZooKeeper](#3-apache-zookeeper)
-
-**B. Kubernetes'te konfigürasyon ve secret**
-
-4. [Kubernetes ConfigMap, Pod, Deployment ve HPA](#4-kubernetes-configmap-pod-deployment-ve-hpa)
-5. [Kubernetes Secret](#5-kubernetes-secret)
-
-**C. Uygulama seviyesinde konfigürasyon**
-
-6. [Spring Cloud Config](#6-spring-cloud-config)
-
-**D. Secret yönetimi**
-
-7. [HashiCorp Vault](#7-hashicorp-vault)
-8. [AWS Secrets Manager](#8-aws-secrets-manager)
-9. [AWS Parameter Store](#9-aws-parameter-store)
-10. [Google Cloud Secret Manager](#10-google-cloud-secret-manager)
-
-**Ek:** [Kaynakça](#kaynakça)
-
-
-> 💡 **Raft** algoritması bu dokümanda birkaç yerde karşımıza çıkar. Ayrıntılı anlatımı [etcd](#1-etcd) bölümündedir; [Consul](#2-consul) ve [Vault](#7-hashicorp-vault) da Raft kullanır.
-
 ---
 
 # A. Koordinasyon ve Servis Keşfi
@@ -83,7 +166,7 @@ Dokümanın ana eksenlerinden biri bu ayrımdır:
 
 ## 1. etcd
 
-### Genel bakış
+### 1.1 Genel bakış
 
 **etcd**, dağıtık sistemlerin çalışması için gereken verileri (yapılandırma, durum bilgisi vb.) saklayan, açık kaynaklı bir **anahtar-değer (key-value) veri deposudur.**
 
@@ -102,7 +185,7 @@ Dokümanın ana eksenlerinden biri bu ayrımdır:
 - Aralık 2018'de **CNCF**'ye (Cloud Native Computing Foundation) bağışlandı. CNCF, kâr amacı gütmeyen ve tarafsız bir kuruluştur.
 - CoreOS daha sonra Red Hat tarafından satın alındı.
 
-### Temel özellikleri
+### 1.2 Temel özellikleri
 
 - **Replicated (çoğaltılmış):** Her düğüm, veri deposunun tamamına sahiptir.
 - **Consistent (tutarlı):** Her okuma işlemi en güncel veriyi döndürür.
@@ -112,7 +195,7 @@ Dokümanın ana eksenlerinden biri bu ayrımdır:
 
 > **gRPC nedir?** Google'ın geliştirdiği, farklı bilgisayarlar veya servisler arasında hızlı ve güvenli iletişim kurmayı sağlayan açık kaynaklı bir **RPC (Remote Procedure Call)** çerçevesidir. RPC ise bir programın, başka bir makinedeki fonksiyonu sanki kendi makinesindeymiş gibi çağırmasını sağlayan yöntemdir.
 
-### Raft algoritması
+### 1.3 Raft algoritması
 
 etcd, **Raft** konsensüs algoritması üzerine inşa edilmiştir. Bir etcd kümesinde aynı anda yalnızca:
 
@@ -169,7 +252,7 @@ Düğüm A:             Düğüm B:
 
 Yazma isteği geldiğinde lider işlemi önce kendi **Raft loguna** ekler, log girdisini takipçilere **çoğaltır** ve çoğaltma doğrulandıktan sonra veriyi **BoltDB tabanlı MVCC veritabanına** kaydeder. Bu sayede konsensüs sağlanmadan hiçbir yazma işlemi kalıcı olmaz.
 
-### Lider seçimi
+### 1.4 Lider seçimi
 
 #### Lider nasıl seçilir?
 
@@ -187,7 +270,7 @@ Raft'ta her liderlik dönemi bir **term** numarasıyla tutulur (1. lider, 2. lid
 
 Eski lider düğümün sorunu çözülüp sisteme geri döndüğünde, ortamda daha yüksek term'e sahip yeni bir lider olduğunu görür ve **Follower olarak kalır.**
 
-### Disk ve performans
+### 1.5 Disk ve performans
 
 etcd saniyede yaklaşık **10.000 yazma işlemi** yapabilir ve bunları **diske kaydeder.** Dolayısıyla performans, her düğümün disk hızına doğrudan bağlıdır.
 
@@ -209,7 +292,7 @@ Disk latency
 
 Yüksek veya değişken I/O gecikmeleri etcd'nin performansını ve **küme kararlılığını** bozabilir (örneğin heartbeat'ler gecikir, gereksiz lider seçimleri başlar).
 
-### etcd ve Kubernetes
+### 1.6 etcd ve Kubernetes
 
 Kubernetes (K8s), konteynerleştirilmiş uygulamaların dağıtımını, ölçeklenmesini ve yönetimini otomatikleştiren açık kaynaklı bir **orkestrasyon platformudur.** Yüzlerce veya binlerce konteyneri elle yönetmek imkansız olduğu için bir orkestra şefi gibi çalışır.
 
@@ -217,7 +300,7 @@ Kubernetes (K8s), konteynerleştirilmiş uygulamaların dağıtımını, ölçek
 
 - **Control Plane (Kontrol Düzlemi):** Kümenin beynidir. Karar alma, planlama ve genel durumu yönetme işlerini yapar.
 - **Worker Node (Çalışan Düğüm):** Uygulamaları çalıştıran fiziksel veya sanal makinelerdir.
-- **Pod:** Kubernetes'in en küçük yapı taşıdır, uygulamaların çalıştığı birimdir ([4. bölümde](#pod) ayrıntılı anlatılıyor).
+- **Pod:** Kubernetes'in en küçük yapı taşıdır, uygulamaların çalıştığı birimdir ([4.3 Pod bölümünde](#43-pod) ayrıntılı anlatılıyor).
 
 #### etcd'nin rolü
 
@@ -233,14 +316,14 @@ Bir **izleme (watch)** fonksiyonu sayesinde Kubernetes, istenen durum ile mevcut
 etcd (değişiklik olur) ──▶ Kubernetes API ──▶ Küme buna göre yeniden yapılandırılır
 ```
 
-### etcd'yi kimler kullanır?
+### 1.7 etcd'yi kimler kullanır?
 
 - **Kubernetes**
 - **Rook**
 - **CoreDNS**
 - **M3**
 
-### Özet tablo
+### 1.8 Özet tablo
 
 | Kavram | Açıklama |
 |---|---|
@@ -259,7 +342,7 @@ etcd (değişiklik olur) ──▶ Kubernetes API ──▶ Küme buna göre yen
 
 ## 2. Consul
 
-### Genel bakış
+### 2.1 Genel bakış
 
 **Consul**, dağıtık ortamlarda servislerin **kaydedilmesini, bulunmasını (discovery), sağlık durumunun izlenmesini ve güvenli iletişimini** sağlayan bir **kontrol düzlemidir (control plane)**.
 
@@ -267,7 +350,7 @@ Fiziksel sunucular, bulut örnekleri, sanal makineler veya konteynerler gibi **d
 
 > **Neden kullanılır?** Mikroservis mimarisinde servislerin birbiriyle konuşması hem bağımlılığı hem karmaşıklığı artırır. Servislerin birbirinin adresini elle bilmesi yerine, adresleri Consul'a sorarlar.
 
-### Consul ile etcd/benzeri araçlar arasındaki fark
+### 2.2 Consul ile etcd/benzeri araçlar arasındaki fark
 
 | | etcd gibi araçlar | Consul |
 |---|---|---|
@@ -278,7 +361,7 @@ Fiziksel sunucular, bulut örnekleri, sanal makineler veya konteynerler gibi **d
 
 Yani Consul'da sadece konfigürasyon dosyaları değil, **servislerin adresi ve port numarası** da saklanır. İki servisin birbiriyle konuşması gerektiğinde ilgili adresler Consul üzerinden paylaşılır.
 
-### Servis discovery: servise nasıl ulaşılır?
+### 2.3 Servis discovery: servise nasıl ulaşılır?
 
 Bir servis Consul'a **iki yolla** ulaşabilir: **HTTP** ve **DNS**.
 
@@ -340,7 +423,7 @@ Payment-3 ✅
 
 Consul sağlıksız instance'ı discovery sonucuna dahil etmez. Böylece trafik çöken servise yönlendirilmez.
 
-### Consul'un özellikleri
+### 2.4 Consul'un özellikleri
 
 1. **Service Discovery:** Servisleri kaydetme ve bulma
 2. **Health Checking:** Servislerin ve node'ların sağlık kontrolü
@@ -360,7 +443,7 @@ Bu bilgi iki amaçla kullanılır:
 - Operatör, cluster'ın sağlığını **izlemek** için
 - Discovery bileşenleri, **sağlıksız host'lara trafik yönlendirmemek** için
 
-### Consul cluster mimarisi
+### 2.5 Consul cluster mimarisi
 
 Consul cluster, **Server** ve **Client** olmak üzere iki tür yapıdan oluşur.
 
@@ -393,7 +476,7 @@ Consul cluster, **Server** ve **Client** olmak üzere iki tür yapıdan oluşur.
 - Veriyi saklama (data store) gibi kritik görevlerden sorumlu **değildir**.
 - Uygulamalar discovery sorgularını genellikle yerel client agent'a yapar, o da bunu server'a iletir. Yani client discovery'de **aracı** olur, veri sahibi olmaz.
 
-### Consul Agent
+### 2.6 Consul Agent
 
 Server ve Client aslında **iki farklı program değildir**. İkisinde de çalışan yapı **Consul Agent**'tır.
 
@@ -435,7 +518,7 @@ Consul'un bütün işlerini tek bir merkezi server'a yaptırmak yerine, her node
 
 Agent'ın görevleri: servisleri **register** etmek, **health check** çalıştırmak, Consul cluster'ıyla **iletişim** kurmak, **service discovery** işlemlerine aracılık etmek ve **local node** hakkında bilgi tutmak.
 
-### Önemli ayrım: state kimde?
+### 2.7 Önemli ayrım: state kimde?
 
 ```text
 Order Service
@@ -457,7 +540,7 @@ Server agent'lar Raft'a katılarak şunları yapar:
 | **Commit** | Çoğunluk onaylayınca değişiklik kesinleşir |
 | **Consensus** | Tüm server'lar aynı durumda uzlaşır |
 
-### Özet
+### 2.8 Özet
 
 - Consul = **servis kayıt defteri + health check + KV store + güvenli iletişim**
 - Servisler birbirini **HTTP API** veya **DNS** ile bulur; sağlıksız instance'lar discovery sonucundan çıkarılır
@@ -468,7 +551,7 @@ Server agent'lar Raft'a katılarak şunları yapar:
 
 ## 3. Apache ZooKeeper
 
-### Apache ZooKeeper nedir?
+### 3.1 Apache ZooKeeper nedir?
 
 Apache ZooKeeper; dağıtık sistemlerde yapılandırma yönetimi, isimlendirme ve senkronizasyon işlemlerini yürüten merkezi bir **koordinasyon servisidir**. Büyük verileri değil, sistemin durumunu belirten küçük boyutlu kritik verileri (meta veri) depolamak için tasarlanmış ve özellikle yüksek okuma performansına göre optimize edilmiştir.
 
@@ -478,7 +561,7 @@ Java ile yazılan proje, başlangıçta Yahoo! bünyesindeki dağıtık sistemle
 
 Hadoop ekosistemindeki projelerin çoğu hayvan isimleriyle (Pig, Hive vb.) anılıyordu. Dağıtık sistemlerdeki bu "hayvanat bahçesini" düzenli tutan ve koordine eden servise de doğal olarak **ZooKeeper** (Hayvan Bakıcısı) adı verilmiştir.
 
-### Mimari yapı
+### 3.2 Mimari yapı
 
 ZooKeeper kümesi (cluster), **1 Lider (Leader)** ve **birden fazla Takipçi (Follower)** sunucudan oluşan bir mimariyle çalışır.
 
@@ -486,7 +569,7 @@ Hiyerarşik bir dosya sistemine benzeyen veri yapısı (znode ağacı) sunucu ro
 
 > 💡 **Önemli not:** ZooKeeper'da okuma işlemleri varsayılan olarak doğrudan bağlanılan sunucudan (takipçiden) yapılır. Eğer o sunucu liderin gerisinde kalmışsa **eski veri (stale data)** dönebilir. Mutlaka en güncel veriye ulaşmak gerekiyorsa, okuma işleminden önce `sync` çağrılmalıdır. Bu yönüyle etcd gibi varsayılan olarak "güçlü tutarlılık" (strong consistency) sunan araçlardan ayrılır.
 
-### Veri modeli: znode kavramı
+### 3.3 Veri modeli: znode kavramı
 
 ZooKeeper veriyi, tıpkı standart bir bilgisayar dosya sistemi gibi **hiyerarşik bir ağaç** yapısında saklar. Bu ağaçtaki her bir düğüme **znode** denir.
 
@@ -503,7 +586,7 @@ ZooKeeper veriyi, tıpkı standart bir bilgisayar dosya sistemi gibi **hiyerarş
 
 Znode'lar hem kendi içlerinde **veri taşıyabilir** hem de **alt düğümlere (children)** sahip olabilirler. Bir znode içinde tutulan veri boyutu küçüktür (varsayılan sınır yaklaşık **1 MB**). Çünkü ZooKeeper bir veritabanı değil, koordinasyon aracıdır.
 
-### Znode türleri
+### 3.4 Znode türleri
 
 Znode'lar, oluşturulurken seçilen ve sonradan değiştirilemeyen yaşam döngüsü modlarına sahiptir. Temel olarak şu türler vardır:
 
@@ -529,7 +612,7 @@ TTL znode, belirli bir süre (milisaniye cinsinden) güncellenmezse sistem taraf
 
 *TTL düğümleri varsayılan olarak kapalıdır. Kullanmak için sunucu yapılandırmasında `zookeeper.extendedTypesEnabled=true` ayarı yapılmalıdır.*
 
-### Avantajları ve kullanım alanları
+### 3.5 Avantajları ve kullanım alanları
 
 **Avantajları**
 
@@ -553,7 +636,7 @@ TTL znode, belirli bir süre (milisaniye cinsinden) güncellenmezse sistem taraf
 
 Sunucu çalıştığı sürece znode hep vardır. Sunucu çalışmayı bırakırsa ya da bağlantı kopukluğu uzun sürüp oturum zaman aşımına (session timeout) uğrarsa, ephemeral znode otomatik olarak silinir. Kısa süreli bir kopuklukta client süre dolmadan yeniden bağlanırsa oturum ve znode korunur. Bu sayede znode'ların varlığına bakarak kaç adet aktif sunucu olduğunu takip edebiliriz.
 
-### Lider seçimi
+### 3.6 Lider seçimi
 
 Peki ZooKeeper'da 1 lider ve takipçileri var demiştik, bu lider seçimi nasıl yapılıyor? Burada iki ayrı lider seçimi olduğunu bilmek gerekiyor.
 
@@ -588,7 +671,7 @@ server-5 → server-4'ü izler
 
 Lider (server-1) öldüğünde sadece server-2 uyandırılır. server-2 çocukları listeler, en küçük numaranın kendisi olduğunu görür ve lider olur. Diğerlerinin uyanmasına gerek yoktur. Yani ZooKeeper kimin lider olduğunu "söylemez", sunucular listeye bakıp kendi sıralarını kendileri belirler. Ortadaki bir sunucu (örneğin server-2) çökerse, onu izleyen server-3 uyandırılır, hâlâ lider olmadığını görür ve bu sefer bir önceki yaşayan sunucuyu (server-1) izlemeye başlar.
 
-### 2026 yılında tespit edilen güvenlik açıkları
+### 3.7 2026 yılında tespit edilen güvenlik açıkları
 
 2026 yılında Apache ZooKeeper'da sistemi doğrudan etkileyen kritik zafiyetler tespit edildi. Bu açıklar **3.9.0 - 3.9.5** ve **3.8.0 - 3.8.6** sürümlerini etkilemektedir ve **3.9.6** ile **3.8.7** yamalarıyla kapatılmıştır.
 
@@ -611,7 +694,7 @@ Ulusal Siber Olaylara Müdahale Merkezi (USOM) da bu zafiyetlerin aktif sistemle
 
 > 💡 Bu bölümde ConfigMap anlatılırken Pod, Deployment ve HPA gibi kavramlar da geçer. Bunların açıklamaları bölümün devamındadır.
 
-### ConfigMap nedir?
+### 4.1 ConfigMap nedir?
 
 Kubernetes içindeki **ConfigMap**, uygulamanın kodundan ayrı olarak hassas olmayan, yani gizli olmayan konfigürasyon verilerini saklamaya yarayan Kubernetes nesnesidir. **ConfigMap gizlilik veya şifreleme sağlamaz!** Şifre, API key, token gibi gizli bilgiler için [Kubernetes Secret](#5-kubernetes-secret) veya harici bir secret yönetim sistemi kullanılmalıdır.
 
@@ -669,7 +752,7 @@ Bir Pod içindeki bir container'ı yapılandırmak için ConfigMap'i kullanmanı
 
 Dördüncü yöntem, ConfigMap'i ve verilerini okumak için kod yazmanız gerektiği anlamına gelir. Ancak Kubernetes API'sini doğrudan kullandığınız için uygulamanız ConfigMap değiştiğinde güncellemeleri almak için abone olabilir ve bu gerçekleştiğinde tepki verebilir. Kubernetes API'sine doğrudan erişim sayesinde bu teknik farklı bir ad alanındaki (namespace) ConfigMap'e erişmenizi de sağlar.
 
-### ConfigMap verilerinin kullanılması
+### 4.2 ConfigMap verilerinin kullanılması
 
 ConfigMap'teki veriler Pod içerisinde temel olarak iki şekilde kullanılabilir:
 
@@ -756,7 +839,7 @@ spec:
 
 > 💡 ConfigMap sonradan değiştirilirse, environment variable olarak verilen değerler çalışan Pod'da kendiliğinden güncellenmez (Pod'un yeniden başlaması gerekir). Volume olarak bağlanan dosyalar ise bir süre sonra güncellenir (`subPath` ile bağlananlar hariç).
 
-### Pod
+### 4.3 Pod
 
 **Pod**, Kubernetes'teki uygulamaların çalıştırıldığı en temel birimdir. Bir veya birden fazla container'ın birlikte çalıştığı Kubernetes çalışma birimidir.
 
@@ -788,7 +871,7 @@ ConfigMap ile birlikte düşündüğümüzde: ConfigMap uygulamanın kullanacağ
 ConfigMap ──▶ Pod ──▶ Container ──▶ Uygulama
 ```
 
-### Kubernetes Deployment
+### 4.4 Kubernetes Deployment
 
 **Deployment**, Kubernetes'e uygulamanın kaç kopyasının çalışacağını ve bu Pod'ların nasıl yönetileceğini söyleyen Kubernetes nesnesidir.
 
@@ -821,7 +904,7 @@ ReplicaSet
 - İstenen 3, mevcut 3 ise herhangi bir işlem yapmaz.
 - Bir Pod çökerse mevcut sayı 2'ye düşer; ReplicaSet eksik olan Pod'u yeniden oluşturur ve sayı tekrar 3 olur.
 
-### Deployment ve ConfigMap birlikte nasıl çalışır?
+### 4.5 Deployment ve ConfigMap birlikte nasıl çalışır?
 
 Örneğin bir SER-AI uygulamamız olduğunu düşünelim. Öncelikle uygulamanın konfigürasyon bilgilerini içeren bir ConfigMap oluşturulur:
 
@@ -883,7 +966,7 @@ Sonuçta yapı şu hale gelir:
 
 Burada **ConfigMap Pod sayısını belirlemez**; Pod'ların ve dolayısıyla container'ların kullanacağı konfigürasyonu sağlar. Pod sayısını ve Pod'ların yönetimini ise Deployment belirler.
 
-### Kullanıcı isteği geldiğinde ne olur?
+### 4.6 Kullanıcı isteği geldiğinde ne olur?
 
 Pod'lar uygulama çalışmaya başlamadan önce oluşturulmuş durumdadır. Kullanıcı uygulamaya istek gönderdiğinde yeni bir Pod oluşturulmaz. **Service**, gelen isteği mevcut ve uygun Pod'lardan birine yönlendirir:
 
@@ -899,14 +982,14 @@ Container
 Uygulama
 ```
 
-### Replica sayısının güncellenmesi
+### 4.7 Replica sayısının güncellenmesi
 
 Deployment içindeki `replicas` değeri, çalıştırılacak Pod sayısını belirler. Uygulamanın yükü artar ve daha fazla Pod'a ihtiyaç duyulursa bu sayı artırılabilir. Bu işlem:
 
 - **Manuel olarak** yapılabilir (`replicas: 3` → `replicas: 10` ile 3 Pod'dan 10 Pod'a çıkılır),
 - **HPA** kullanılarak otomatik olarak yapılabilir.
 
-### HPA (Horizontal Pod Autoscaler)
+### 4.8 HPA (Horizontal Pod Autoscaler)
 
 **HPA**, uygulamanın çalışma sırasında kullandığı kaynakları ve tanımlanan diğer metrikleri izleyerek Pod sayısını otomatik olarak artırıp azaltmaya yarayan Kubernetes nesnesidir.
 
@@ -944,18 +1027,18 @@ Pod sayısını artır veya azalt
 
 ## 5. Kubernetes Secret
 
-### Kubernetes Secret nedir?
+### 5.1 Kubernetes Secret nedir?
 
 Secret'ın genel tanımı için [giriş bölümüne](#secret-nedir-secret-yönetimi-nedir) bakınız. **Kubernetes Secret**, bu ihtiyacı Kubernetes içinde karşılayan nesnedir: uygulamanın ihtiyaç duyduğu hassas bilgileri (parola, token, sertifika, API anahtarı vb.) Kubernetes içerisinde saklar ve Pod'lara sağlar. Böylece bu bilgilerin container image'ına ya da Pod/Deployment tanımına gömülmesi gerekmez.
 
-### Kim tarafından, ne amaçla geliştirildi?
+### 5.2 Kim tarafından, ne amaçla geliştirildi?
 
 Kubernetes, **Google** tarafından başlatılan ve 2014'te açık kaynak olarak duyurulan bir projedir. 1.0 sürümü Temmuz 2015'te yayımlanmış ve proje **CNCF**'ye bağışlanmıştır. Secret nesnesi de Kubernetes'in ilk dönemlerinden beri API'nin bir parçasıdır.
 
 Secret'ın tasarım amacı, parola ve anahtar gibi bilgilerin container'lara, container'ın kendisini değiştirmeden dağıtılmasıdır. Tasarım dokümanında şu ihtiyaç öne çıkar: container'lar Kubernetes master'ı, git depoları ya da veritabanları gibi iç ve dış kaynaklara erişmek için secret'lara ihtiyaç duyar. İlk tasarımda bu bilgiler container'a özel bir volume türüyle (dosya olarak) sağlanıyordu. Ortam değişkeni olarak kullanma ise sonradan eklenmiştir.
 
 
-### Secret nasıl kullanılır?
+### 5.3 Secret nasıl kullanılır?
 
 Secret'ın kullanılma akışı:
 
@@ -1024,13 +1107,13 @@ Secret genellikle ConfigMap ile birlikte kullanılır: normal ayarlar ConfigMap'
                  Uygulama
 ```
 
-### Secret'lar nerede saklanır?
+### 5.4 Secret'lar nerede saklanır?
 
 Kubernetes kendi verilerini saklamak için [etcd](#1-etcd) kullanır. Secret oluşturduğunuzda Kubernetes'in bu bilgiyi bir yerde saklaması gerekir ve bu bilgiler de etcd'ye kaydedilir.
 
 Peki o zaman Secret'a ne gerek var diye düşünebilirsiniz. Burada etcd'nin tuttuğu Kubernetes'in kendi verileridir; Secret ise kullanıcı uygulamalarındaki ya da servislerindeki şifre gibi gizli tutulması gereken bilgileri temsil eden nesnedir.
 
-### `data` ve `stringData` farkı
+### 5.5 `data` ve `stringData` farkı
 
 Secret YAML'ları iki şekilde yazılabilir:
 
@@ -1052,13 +1135,13 @@ stringData:
 
 Burada yapılan işlem **şifreleme değil, encoding'dir** (kodlama). Bu encoding işlemini herkes geri çevirebilir, yani decode edebilir. Dolayısıyla bu bir veri gizleme işleminden ziyade, veriyi belirli bir karakter formatında temsil etme işlemidir. Base64, verinin Kubernetes API/YAML içerisindeki veri formatına uygun şekilde taşınabilmesi için kullanılır.
 
-### ConfigMap'e göre güvenlik avantajı: RBAC
+### 5.6 ConfigMap'e göre güvenlik avantajı: RBAC
 
 RBAC (Role-Based Access Control) hem ConfigMap hem Secret için geçerlidir. Ancak Secret'lar ayrı bir kaynak türü olduğu için erişim ayrı ayrı yönetilebilir. Örneğin bir kullanıcıya ConfigMap'leri okuma izni verip Secret'ları okuma izni vermemek mümkündür. Böylece kullanıcı Secret içerisindeki hassas verileri okuyamaz.
 
 Servisler tarafında ise **ServiceAccount** kullanılır. Pod'lar bir ServiceAccount ile çalışır ve RBAC kuralları ile bu ServiceAccount'un hangi Secret'lara erişebileceği belirlenebilir.
 
-### etcd'de encryption at rest
+### 5.7 etcd'de encryption at rest
 
 Bir Secret'ımız olduğunu düşünelim:
 
@@ -1132,11 +1215,11 @@ Rotasyon, dinamik secret gibi daha gelişmiş ihtiyaçlar için harici sistemler
 
 ## 6. Spring Cloud Config
 
-### Neden ihtiyaç var?
+### 6.1 Neden ihtiyaç var?
 
 Mikro hizmetler mimarisinde birçok mikro hizmet bir araya gelerek bir uygulamayı oluşturur ve bunlar genellikle farklı ekipler tarafından geliştirilip ayrı ayrı dağıtılır. Her servisin kendi yapılandırma dosyasını taşıması, servis sayısı arttıkça yönetimi zorlaştırır. Spring Cloud Config bu soruna çözüm olarak yapılandırmayı merkezi bir yerde toplar.
 
-### Spring Cloud Config Server nedir?
+### 6.2 Spring Cloud Config Server nedir?
 
 Config Server modülü, yapılandırma dosyalarımızı uzak bir depodan (GitHub, GitLab, Bitbucket vb.), yerel (local) bir dizinden ya da farklı servisler üzerinden (AWS, HashiCorp Vault vb.) okumamıza olanak sağlar.
 
@@ -1154,7 +1237,7 @@ etcd ve ZooKeeper da yapılandırma saklayabilir ama onlar genel amaçlı koordi
 
 *Resim kaynağı: https://kayhanozturk.medium.com/spring-cloud-config-server-nedir-01a268d8c6e6*
 
-### Nasıl çalışır?
+### 6.3 Nasıl çalışır?
 
 ```text
 Git deposu ──▶ Config Server ──(HTTP)──▶ Servis A
@@ -1167,7 +1250,7 @@ Git deposu ──▶ Config Server ──(HTTP)──▶ Servis A
 3. Bir servis açılırken Config Server'a istek atar ve kendi ayarlarını alır.
 4. Servis bu ayarlarla ayağa kalkar.
 
-### Ön bilgi: Bean nedir?
+### 6.4 Ön bilgi: Bean nedir?
 
 Yapılandırmanın canlı yenilenmesini anlamak için önce Spring'deki **bean** kavramını bilmek gerekiyor.
 
@@ -1206,7 +1289,7 @@ public class OrderController {
 
 Spring varsayılan olarak her bean'den **tek bir tane** oluşturur ve uygulama boyunca herkes aynı nesneyi kullanır. Bean uygulama açılırken bir kez oluşturulur ve sonradan yeniden oluşturulmaz.
 
-### Çalışma anında yapılandırmayı yenileme
+### 6.5 Çalışma anında yapılandırmayı yenileme
 
 Normalde servisler ayarları **sadece başlarken** okur. Bir bean ayarı oluşturulurken bir kez okuduğu için, Config Server'daki ayar sonradan değişse bile bean eski değerle devam eder. Ayar değişince servisi yeniden başlatmamak için iki yol vardır:
 
@@ -1251,7 +1334,7 @@ Servisi yeniden başlatmaya gerek kalmaz. Ama yalnızca `@RefreshScope` ile işa
 
 ZooKeeper ve etcd'den farkı şudur: onlarda değişiklik **watch** ile otomatik bildirilir. Spring Cloud Config'te ise yenileme mekanizmasını (refresh ya da Bus) biz kurarız.
 
-### Client'ın Config Server'ı bulma yöntemleri
+### 6.6 Client'ın Config Server'ı bulma yöntemleri
 
 | Yaklaşım | Açıklama |
 |---|---|
@@ -1260,7 +1343,7 @@ ZooKeeper ve etcd'den farkı şudur: onlarda değişiklik **watch** ile otomatik
 
 İkincisi, Config Server adresi değiştiğinde client ayarlarını güncellemeyi gerektirmez.
 
-### Kubernetes kullanılıyorsa?
+### 6.7 Kubernetes kullanılıyorsa?
 
 Kubernetes kullanılan ortamlarda [ConfigMap ve Secret](#4-kubernetes-configmap-pod-deployment-ve-hpa) zaten yapılandırma yönetimi sağlar. Bu yüzden şu soru sık sorulur: "Spring Cloud Config'e hâlâ ihtiyaç var mı?"
 
@@ -1277,17 +1360,17 @@ Secret ve secret yönetimi kavramları için [giriş bölümüne](#secret-nedir-
 
 ## 7. HashiCorp Vault
 
-### Vault nedir?
+### 7.1 Vault nedir?
 
 HashiCorp Vault, gizlilik açısından önemli olan konfigürasyonları ve projelerin hassas bilgilerini merkezi ve güvenli şekilde, ayrı path'lerde tutan bir yapıdır.
 
 ![Vault](https://web-unified-docs-hashicorp.vercel.app/api/assets/vault/latest/img/how-vault-works.png)
 
-### Kim tarafından, ne zaman geliştirildi?
+### 7.2 Kim tarafından, ne zaman geliştirildi?
 
 HashiCorp (Mitchell Hashimoto ve Armon Dadgar) tarafından başlangıçta şirket içi ihtiyaçlar için geliştirilen Vault, Nisan 2015'teki ilk sürümünden itibaren "dinamik gizli bilgi üretme" yeteneğiyle öne çıkmıştır. 2018'de kararlı 1.0 sürümüne ulaşan ve Şubat 2025'teki satın almayla IBM bünyesine katılan araç; günümüzde kaynak kodu açık (2023'ten itibaren BSL lisansıyla) ücretsiz "Community" ve ücretli "Enterprise" seçenekleriyle kullanılmaya devam etmektedir.
 
-### Temel özellikleri
+### 7.3 Temel özellikleri
 
 #### 1. Anahtar/değer sırlarını şifreli saklama
 
@@ -1301,7 +1384,7 @@ Vault, şifrelemeyi bir hizmet olarak sunar. **Transit** gizli veri motoruyla Va
 
 HashiCorp Vault'u diğer şifrelenmiş anahtar-değer depolarından ayıran özellik budur: Vault, istek geldiğinde (on-demand) gizli bilgi üretebilir. Aşağıda ayrıntılı anlatılıyor.
 
-### Dinamik gizli bilgiler nasıl çalışır?
+### 7.4 Dinamik gizli bilgiler nasıl çalışır?
 
 #### Önce problem: sabit şifre
 
@@ -1357,7 +1440,7 @@ Bu şifreler her zaman bir **lease (kira) süresiyle** gelir. Servis belirli bir
 
 > ⚠️ Şifre, kullanıldıktan sonra otomatik olarak iptal olmaz. Geçerlilik süresi dolana ya da iptal edilene kadar çalışmaya devam eder. Kısa süre ayarlamak bu yüzden önemlidir.
 
-### Sızıntı problemi ve dinamik gizli bilgiler
+### 7.5 Sızıntı problemi ve dinamik gizli bilgiler
 
 Uygulamalar genellikle gizli bilgileri günlük dosyalarında veya kayıt sistemlerinde bırakır. HashiCorp'un kurucu ortağı Armon Dadgar'a göre gizli bilgiler ayrıca harici izleme sistemlerine gönderilen istisna izleme kayıtlarında veya çökme raporlarında yakalanabilir, ya da bir hatayla karşılaşıldıktan sonra hata ayıklama uç noktaları ve teşhis sayfaları aracılığıyla sızdırılabilir.
 
@@ -1385,11 +1468,11 @@ Uygulama
 
 Dolayısıyla secret'ı sadece config dosyasından çıkarmak tek başına bütün problemi çözmüyor. Ama dynamic secret kullanırsak, sızan credential'ın ömür süresi kısa olur.
 
-### Entegrasyonlar
+### 7.6 Entegrasyonlar
 
 Vault; GitHub, Kubernetes, Microsoft SQL Server EKM sağlayıcısı ve ServiceNow gibi sistemlerle de entegre edilebilir.
 
-### Nasıl çalışır?
+### 7.7 Nasıl çalışır?
 
 1. İstemciler (client), manuel olarak oluşturulan belirteçler (token), LDAP gibi protokoller veya Azure ve AWS gibi üçüncü taraf sağlayıcılar aracılığıyla kimlik doğrulaması yapar.
 2. Vault, istemci isteğini dahili bir varlığa ve geçerli güvenlik politikalarına bağlayan bir erişim belirteci oluşturur.
@@ -1401,7 +1484,7 @@ Vault; GitHub, Kubernetes, Microsoft SQL Server EKM sağlayıcısı ve ServiceNo
 İstemci ──(token + path)──────▶ Vault ──▶ Politika kontrolü ──▶ İzin ver / Reddet
 ```
 
-### Depolama
+### 7.8 Depolama
 
 Vault verileri bir depolama arka ucunda (storage backend) tutar. Seçeneklerden biri **Integrated Storage (Raft)**'tır. Burada veriler, [etcd](#1-etcd) bölümünde de gördüğümüz Raft algoritmasıyla Vault düğümleri arasında çoğaltılarak depolanır.
 
@@ -1409,7 +1492,7 @@ Vault verileri bir depolama arka ucunda (storage backend) tutar. Seçeneklerden 
 
 ## 8. AWS Secrets Manager
 
-### AWS Secrets Manager nedir?
+### 8.1 AWS Secrets Manager nedir?
 
 AWS Secrets Manager, API anahtarları, veri tabanı kimlik bilgileri ve şifreleme anahtarları gibi bilgilerin güvenli bir şekilde depolanması ve yönetimi için tasarlanmış, AWS üzerindeki hazır bir secret yönetimi servisidir.
 
@@ -1419,7 +1502,7 @@ Servis tamamen **AWS tarafından yönetilir** (managed service). Yani [HashiCorp
 
 AWS Secrets Manager, **Amazon Web Services (AWS)** tarafından geliştirilmiştir ve **4 Nisan 2018'de**, San Francisco'daki AWS Summit etkinliğinde duyurulmuştur. İlk çıktığında MySQL, PostgreSQL ve Amazon Aurora için hazır rotasyon entegrasyonu ile geliyordu. Yani HashiCorp Vault'tan (Nisan 2015) yaklaşık üç yıl sonra çıkmıştır.
 
-### Temel özellikleri
+### 8.2 Temel özellikleri
 
 #### 1. KMS ile şifreleme
 
@@ -1473,7 +1556,7 @@ Bir secret'ın aynı anda birden fazla sürümü bulunabilir ve her sürüm bir 
 - **Denetim (audit):** Secret'a kimin ne zaman eriştiği AWS'nin loglama servislerine (CloudTrail) yazılır.
 - **Boyut sınırı:** Bir secret en fazla **64 KB** olabilir. Düz metin, JSON veya binary olabilir.
 
-### Nasıl çalışır?
+### 8.3 Nasıl çalışır?
 
 ```text
 Uygulama (IAM rolü ile)
@@ -1500,7 +1583,7 @@ aws secretsmanager create-secret \
 aws secretsmanager get-secret-value --secret-id prod/db-credentials
 ```
 
-### Fiyatlandırma
+### 8.4 Fiyatlandırma
 
 Kullandıkça ödeme modeli vardır:
 
@@ -1513,7 +1596,7 @@ Kullandıkça ödeme modeli vardır:
 
 Bu yüzden uygulamada secret'ı **her istekte** yeniden çekmek yerine bir kez okuyup bellekte (cache) tutmak hem maliyeti hem gecikmeyi azaltır.
 
-### HashiCorp Vault ile fark
+### 8.5 HashiCorp Vault ile fark
 
 | | AWS Secrets Manager | HashiCorp Vault |
 |---|---|---|
@@ -1524,11 +1607,11 @@ Bu yüzden uygulamada secret'ı **her istekte** yeniden çekmek yerine bir kez o
 
 Önemli fark şudur: Secrets Manager mevcut bir secret'ı **zaman zaman değiştirir**, ama aynı anda onu okuyan tüm servisler aynı geçerli değeri görür. Vault'un dinamik secret özelliğinde ise her servis, istek geldiği anda **kendine özel** bir kimlik bilgisi alır.
 
-### Parameter Store ile fark
+### 8.6 Parameter Store ile fark
 
-AWS'de bir de **Systems Manager Parameter Store** vardır. İkisi benzer görünür ama amaçları farklıdır. Karşılaştırma [Parameter Store bölümünde](#secrets-manager-ile-fark) verilmiştir.
+AWS'de bir de **Systems Manager Parameter Store** vardır. İkisi benzer görünür ama amaçları farklıdır. Karşılaştırma [Parameter Store bölümünde](#97-secrets-manager-ile-fark) verilmiştir.
 
-### Spring Cloud Config ile ilişkisi
+### 8.7 Spring Cloud Config ile ilişkisi
 
 [Spring Cloud Config Server](#6-spring-cloud-config), yapılandırma kaynağı olarak AWS Secrets Manager'ı da kullanabilir. Kullandığımız Spring Cloud sürümüne göre ayar adları değişebileceği için resmi dokümana bakmak gerekir.
 
@@ -1536,7 +1619,7 @@ AWS'de bir de **Systems Manager Parameter Store** vardır. İkisi benzer görün
 
 ## 9. AWS Parameter Store
 
-### AWS Parameter Store nedir?
+### 9.1 AWS Parameter Store nedir?
 
 Parameter Store; sunucu, servis ya da uygulama ayarları ve ortam değişkenleri gibi hassas olan veya olmayan veriler dahil olmak üzere parametreleri depolamak ve yönetmek için kullanılır. Ayarları kodun dışında, merkezi bir yerde tutar ve uygulamalar oradan okur; böylece her ayar değişikliğinde uygulamayı yeniden derlemek gerekmez.
 
@@ -1546,7 +1629,7 @@ Parameter Store, **AWS Systems Manager (SSM)** servisinin bir parçasıdır. Ser
 
 Parameter Store, **Amazon Web Services (AWS)** tarafından geliştirilmiştir. AWS re:Invent 2016 etkinliğinde, o dönem adı **EC2 Systems Manager** olan servisin bir özelliği olarak duyurulmuştur. Servis sonradan AWS Systems Manager adını almıştır. Sürümleme desteği ise Ekim 2017'de eklenmiştir. Yani AWS Secrets Manager'dan (Nisan 2018) önce çıkmıştır.
 
-### Temel özellikleri
+### 9.2 Temel özellikleri
 
 #### 1. Key-value yapısı ve hiyerarşi
 
@@ -1605,13 +1688,13 @@ Parametre deposu, bir AWS bölgesindeki birden fazla kullanılabilirlik bölgesi
 
 AWS Lambda, EC2, ECS ve diğer hizmetlerle sorunsuz yapılandırma yönetimi için birlikte çalışır. Ayrıca CloudFormation, CodePipeline ve Systems Manager'ın Run Command gibi özelliklerinden de parametrelere başvurulabilir.
 
-### Avantajları
+### 9.3 Avantajları
 
 - Sunucu yönetimi gerektirmeyen, güvenli, ölçeklenebilir ve barındırılan (managed) bir yapılandırma ve gizli bilgi yönetimi hizmeti kullanırız.
 - Verilerimizi kodumuzdan ayırarak güvenlik durumumuzu iyileştiririz.
 - Erişim kontrolünü ve denetimini ayrıntılı seviyelerde yaparız.
 
-### Standart ve gelişmiş (Advanced) katman
+### 9.4 Standart ve gelişmiş (Advanced) katman
 
 Parameter Store'da iki katman vardır. Her parametre için ayrı ayrı seçilir ve varsayılan olarak standart katman kullanılır.
 
@@ -1626,7 +1709,7 @@ Parameter Store'da iki katman vardır. Her parametre için ayrı ayrı seçilir 
 - **Intelligent-Tiering:** Parametreyi sistemin ihtiyaca göre otomatik olarak gelişmiş katmana geçirmesini sağlayan seçenektir.
 - Standarttan gelişmişe geçilebilir, **gelişmişten standarda geri dönülemez.** Dönmek için parametreyi silip yeniden oluşturmak gerekir.
 
-### Nasıl çalışır?
+### 9.5 Nasıl çalışır?
 
 ```text
 Uygulama (IAM rolü ile)
@@ -1662,7 +1745,7 @@ aws ssm get-parameters-by-path \
   --with-decryption
 ```
 
-### Fiyatlandırma
+### 9.6 Fiyatlandırma
 
 - Standart parametreler **ücretsizdir.**
 - Gelişmiş parametreler, parametre başına aylık küçük bir ücrete tabidir.
@@ -1670,7 +1753,7 @@ aws ssm get-parameters-by-path \
 
 > ⚠️ Fiyatlar zamanla değişebilir. Güncel rakamlar için AWS'nin resmi fiyat sayfasına bakmak gerekir.
 
-### Secrets Manager ile fark
+### 9.7 Secrets Manager ile fark
 
 [AWS Secrets Manager](#8-aws-secrets-manager) ile Parameter Store benzer görünür ama amaçları farklıdır:
 
@@ -1685,7 +1768,7 @@ aws ssm get-parameters-by-path \
 
 Kısaca: rotasyon gereken gizli bilgiler (veritabanı şifresi gibi) için Secrets Manager, rotasyon gerekmeyen sıradan ayarlar ve küçük secret'lar için Parameter Store daha uygundur.
 
-### Spring ile ilişkisi
+### 9.8 Spring ile ilişkisi
 
 Spring tarafında **Spring Cloud AWS**, Parameter Store'u uygulamanın yapılandırma kaynağı olarak kullanabilir. Böylece parametreler `@Value` gibi mekanizmalarla okunur. Kullanılan sürüme göre ayar adları değişebileceği için resmi dokümana bakmak gerekir.
 
@@ -1709,7 +1792,7 @@ Dağıtık bir sistemde birden fazla uygulama (Backend 1, Backend 2, Worker) ayn
 
 Uygulamalar, gerekli izinlere sahip olduklarında gizli bilgileri Secret Manager üzerinden alır.
 
-### Secret Version (gizli bilgi sürümleri)
+### 10.1 Secret Version (gizli bilgi sürümleri)
 
 Secret Manager, gizli bilgilerin farklı sürümlerini yönetmeyi sağlar. Sürümler, kademeli dağıtımları ve gerektiğinde geri almayı kolaylaştırır.
 
@@ -1724,7 +1807,7 @@ DATABASE_PASSWORD
 
 Bu sayede gizli bilgi yanlışlıkla değiştirilirse veya yeni sürümle ilgili bir sorun yaşanırsa önceki sürüme geri dönülebilir. Ayrıca artık ihtiyaç duyulmayan sürümler devre dışı bırakılabilir veya silinebilir.
 
-### Encryption (şifreleme)
+### 10.2 Encryption (şifreleme)
 
 Secret Manager'da gizli bilgiler hem aktarım sırasında hem de depolanırken şifrelenir.
 
@@ -1735,7 +1818,7 @@ Daha ayrıntılı şifreleme anahtarı kontrolü isteyen kullanıcılar, **Custo
 
 Varsayılan şifreleme ile CMEK arasındaki temel fark, şifrelemenin varlığı değil, kullanılan anahtar üzerindeki kontrol düzeyidir.
 
-### IAM (Identity and Access Management)
+### 10.3 IAM (Identity and Access Management)
 
 IAM, kullanıcıların ve servislerin hangi kaynaklar üzerinde hangi işlemleri yapabileceğini belirler.
 
@@ -1760,7 +1843,7 @@ TLS ve IAM farklı amaçlara hizmet eder:
 - **TLS:** Verinin aktarım sırasında korunmasını sağlar.
 - **IAM:** Kimlerin hangi kaynaklara erişebileceğini ve hangi işlemleri yapabileceğini kontrol eder.
 
-### Replication (çoğaltma)
+### 10.4 Replication (çoğaltma)
 
 Secret Manager, gizli bilgileri farklı konumlarda çoğaltarak yüksek kullanılabilirliği ve dayanıklılığı destekler. Böylece tek bir konumda yaşanan sorunların hizmet üzerindeki etkisi azaltılabilir.
 
@@ -1774,7 +1857,7 @@ Google Cloud, çoğaltma konumlarını kendisi yönetir. Kullanıcının belirli
 
 Kullanıcı, gizli bilgilerin hangi Google Cloud bölgelerinde çoğaltılacağını belirleyebilir. Çoğaltma konumları ihtiyaca göre seçilir ve coğrafi konum ile veri yerleşimi gereksinimleri üzerinde daha fazla kontrol sağlanır. Fiyatlandırma, seçilen konumlara ve geçerli ücretlendirme modeline bağlıdır.
 
-### Secret Manager ile etcd ve Consul'un birlikte kullanılması
+### 10.5 Secret Manager ile etcd ve Consul'un birlikte kullanılması
 
 [etcd](#1-etcd) ve [Consul](#2-consul) normal konfigürasyonun, Secret Manager ise hassas bilgilerin yönetimine odaklanır. Bu yüzden birbirinin alternatifi olmak zorunda değildir; aynı sistem içinde birlikte çalışabilir (normal ve gizli bilgi ayrımı için [giriş bölümündeki tabloya](#konfigürasyon-ile-secret-arasındaki-fark) bakınız):
 
