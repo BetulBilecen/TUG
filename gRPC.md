@@ -9,11 +9,12 @@
   - [Dil Bağımsızlığı Nasıl Sağlanır?](#dil-bağımsızlığı-nasıl-sağlanır)
 - [HTTP/2'nin HTTP/1.1'den Farkları](#http2nin-http11den-farkları)
 - [gRPC Haberleşme Yöntemleri](#grpc-haberleşme-yöntemleri)
-  - [Deadline (Son Tamamlanma Süresi)](#deadline-son-tamamlanma-süresi)
-  - [Cancellation (iptal)](#cancellation-iptal)
+  - [Deadline](#deadline)
+  - [Cancellation](#cancellation)
 - [gRPC Status Codes](#grpc-status-codes)
 - [gRPC'nin Avantajları](#grpcnin-avantajları)
 - [gRPC'nin Dezavantajları](#grpcnin-dezavantajları)
+- [gRPC'nin Implementasyonu (Uygulaması)](#grpcnin-implementasyonu-uygulaması)
 - [gRPC ve REST Karşılaştırması](#grpc-ve-rest-karşılaştırması)
   - [Peki Madem gRPC Bu Kadar Güçlü, Neden Hâlâ REST Kullanıyoruz?](#peki-madem-grpc-bu-kadar-güçlü-neden-hâlâ-rest-kullanıyoruz)
 - [Kaynaklar](#kaynaklar)
@@ -89,23 +90,59 @@ Bu özelliklerin yanında HTTP/2, HTTP/1.1'e göre daha verimli bir iletişim ya
 
 ## gRPC Haberleşme Yöntemleri
 
+![gRPC](Images/gRPC.jpg)
+
 Daha önce gRPC'nin bir streaming özelliği olduğundan bahsetmiştik. gRPC'nin streaming yapısı, HTTP/2'nin sağladığı sürekli veri akışı ve aynı bağlantı üzerinden birden fazla mesajın taşınabilmesi gibi özelliklerden yararlanır. gRPC'de temel olarak dört farklı iletişim türü bulunur:
 * **Unary:** Client'ın server'a tek bir istek gönderdiği ve server'ın tek bir yanıt verdiği en basit RPC türüdür.
-* **Server → Client Streaming:** Client server'a tek bir istek gönderir. Server ise bu isteğe karşılık birden fazla mesajı stream halinde client'a gönderir.
-* **Client → Server Streaming:** Client bir stream açarak server'a birden fazla mesaj gönderir. Client mesajlarını göndermeyi tamamladıktan sonra server tek bir yanıt gönderir.
-* **Bi-directional Streaming:** İstemci ile sunucu arasında sürekli bir iletişim akışı kurulur. İstemci bir veya birden fazla mesaj gönderirken server da buna karşılık bir veya birden fazla mesaj gönderebilir. İki tarafın stream'i birbirinden bağımsız çalışır; yani client mesaj gönderirken server'ın cevap vermesini beklemek zorunda değildir. Bu sayede iki taraf aynı bağlantı üzerinden karşılıklı olarak veri gönderebilir.
 
-### Deadline (Son Tamamlanma Süresi)
+```text
+İstemci          Sunucu        
+    │── istek ─────▶│              
+    │◀── cevap ─────│           
+```
+* **Server → Client Streaming:** Client server'a tek bir istek gönderir. Server ise bu isteğe karşılık birden fazla mesajı stream halinde client'a gönderir.
+````text
+ İstemci          Sunucu            
+    │── istek ─────▶ │
+    │◀── cevap 1 ─── │
+    │◀── cevap 2 ─── │
+    │◀── cevap N ─── │
+````
+* **Client → Server Streaming:** Client bir stream açarak server'a birden fazla mesaj gönderir. Client mesajlarını göndermeyi tamamladıktan sonra server tek bir yanıt gönderir.
+````text
+İstemci          Sunucu       
+    │── istek 1 ───▶│                
+    │── istek 2 ───▶│          
+    │── istek N ───▶│           
+    │◀── cevap ─────│
+````
+* **Bi-directional Streaming:** İstemci ile sunucu arasında sürekli bir iletişim akışı kurulur. İstemci bir veya birden fazla mesaj gönderirken server da buna karşılık bir veya birden fazla mesaj gönderebilir. İki tarafın stream'i birbirinden bağımsız çalışır; yani client mesaj gönderirken server'ın cevap vermesini beklemek zorunda değildir. Bu sayede iki taraf aynı bağlantı üzerinden karşılıklı olarak veri gönderebilir.
+````text
+ İstemci          Sunucu          
+    │── istek 1 ───▶│
+    │◀── cevap 1 ───│    
+    │── istek 2 ───▶│
+    │◀── cevap 2 ───│
+````
+
+### Deadline 
 
 gRPC'nin bir diğer önemli özelliği Deadline kullanımıdır. Client, bir gRPC isteğinin tamamlanması için en fazla ne kadar süre beklemek istediğini belirleyebilir. Bunun temel nedeni, bir serviste meydana gelen gecikmenin veya kilitlenmenin diğer servisleri de etkileyerek tüm sistemi yavaşlatmasını ve domino etkisi (Cascading Failure) oluşturmasını engellemektir. Örneğin bir servis yanıt vermediğinde diğer servisler bu yanıtı beklemeye devam ederse gereksiz CPU ve bellek kullanımı oluşabilir ve zamanla diğer uygulamaların çalışması da etkilenebilir.
 
 Bu nedenle client tarafından belirlenen en son tamamlanma süresine Deadline denir. Server da bir RPC'nin deadline'ının dolup dolmadığını veya işlemi tamamlamak için ne kadar süre kaldığını kontrol edebilir. Böylece uzun süre bekleyen isteklerin oluşturabileceği yığılma ve gereksiz kaynak tüketiminin önüne geçilebilir.
 
-### Cancellation (iptal)
+### Cancellation 
 
-gRPC'nin bir diğer önemli özelliği ise RPC'lerin iptal edilebilmesidir. Client veya server herhangi bir zamanda devam eden bir RPC'yi iptal edebilir. RPC iptal edildiğinde ilgili işlem sonlandırılır ve artık bu istek için gereksiz yere çalışmaya devam edilmesi engellenir.
+gRPC'nin bir diğer önemli özelliği ise RPC'lerin iptal edilebilmesidir. Client ve server arasındaki iletişim durumunu takip ederek ihtiyaç duyulmayan bir RPC isteği iptal edilebilir. RPC iptal edildiğinde, ilgili işlemin durdurulması sağlanır ve bu istek için gereksiz yere kaynak tüketilmesinin önüne geçilir.
+
+Neden gönderdiğimiz bir isteğe ihtiyaç duymayalım ve onu iptal edelim derseniz, bunu bir örnekle açıklayabiliriz. Bir arama motorunda “çay” kelimesini aratmak istediğinizi düşünelim. Önce “ç” karakterini, sonra “a” ve son olarak “y” karakterini gireriz. Web siteleri, biz “ç” harfini girdiğimizde arka planda “ç” ile ilgili önerileri arar. Ardından “a” harfini girdiğimizde “ça”, son olarak “y” harfini girdiğimizde ise “çay” ile ilgili sonuçları arar.
+
+Diyelim ki aradığımız sonucu bulduk ve ilgili web sitesine girdik. Bu sırada arka planda en az üç istek gönderilmiş olabilir. Ancak “çay” kelimesini yazdığımızda önceki “ç” ve “ça” isteklerine artık ihtiyaç kalmaz. Cancellation özelliği sayesinde bu istekler iptal edilebilir ve sunucunun gereksiz yere çalışmaya devam etmesinin önüne geçilebilir. Böylece sunucunun CPU ve RAM gibi kaynakları boş yere tüketmesi azaltılabilir.
+
+![Cancellation Example](Images/Cancellation%20Example.jpg)
 
 ## gRPC Status Codes
+![gRPC Status Codes](Images/gRPC%20Status%20Codes.jpg)
 
 gRPC arka planda HTTP/2 kullansa da, HTTP seviyesindeki `200 OK` yanıtı sadece ağ taşıma katmanının (transport) başarılı olduğunu gösterir. Yani paket sunucuya sağ salim varmıştır. Fakat sunucu tarafındaki fonksiyonun içinde ne olduğu (kullanıcı bulunamadı mı, işlem zaman aşımına mı uğradı, yetki mi yok) HTTP katmanının konusu değildir. Bu nedenle gRPC, fonksiyon çağrılarına özel 0 ile 16 arasında standart durum kodları (Status Codes) tanımlamıştır:
 
@@ -139,22 +176,180 @@ gRPC arka planda HTTP/2 kullansa da, HTTP seviyesindeki `200 OK` yanıtı sadece
 * **Okunabilirliğinin düşük olması:** HTTP API istekleri genellikle JSON gibi metin tabanlı formatlarda gönderildiği için insanlar tarafından kolayca okunabilir ve oluşturulabilir. gRPC mesajları ise varsayılan olarak Protobuf ile binary formatta kodlandığından, bir insan tarafından okunup anlaşılması HTTP API isteklerine göre daha zordur.
 * **Entegrasyonunun daha karmaşık olması:** gRPC'nin `.proto` dosyaları, kod üretimi, Protobuf yapısı ve HTTP/2 gibi kendi çalışma yapıları bulunduğu için REST API'lere göre projeye ilk kez entegre edilmesi biraz daha fazla öğrenme ve yapılandırma gerektirebilir. Bu nedenle bazı durumlarda implementasyonu REST API'lere göre daha karmaşık olabilir.
 
+## gRPC'nin Implementasyonu (Uygulaması)
+Anlattığımız kavramların kod üzerinde nereye denk geldiğini görmek için basit bir uygulama yazalım. gRPC'nin dört iletişim tipini ASP.NET Core ile uygulayıp Postman üzerinden deneyeceğiz.
+```text
+GrpcDemo/
+├── Protos/demo.proto          # sözleşme
+├── Services/DemoService.cs    # sunucu mantığı
+├── Program.cs                 # servis kaydı
+└── GrpcDemo.csproj
+```
+
+Reflection paketini ekledik, böylece Postman `.proto` dosyasını elle yüklemeden metotları kendisi listeler:
+
+```bash
+dotnet add package Grpc.AspNetCore.Server.Reflection
+```
+
+### Sözleşme: `demo.proto`
+
+```proto
+syntax = "proto3";
+option csharp_namespace = "GrpcDemo";
+
+package demo;
+
+// protoc bu tanımdan Demo.DemoBase sınıfını üretir (sunucu altyapısı)
+service Demo {
+  rpc Unary (UserRequest) returns (UserResponse);                      // Unary: 1 istek -> 1 cevap
+  rpc ServerStream (UserRequest) returns (stream UserResponse);        // Server Streaming: 1 istek -> N cevap
+  rpc ClientStream (stream NumberRequest) returns (SumResponse);       // Client Streaming: N istek -> 1 cevap
+  rpc BidiStream (stream ChatMessage) returns (stream ChatMessage);    // Bi-directional Streaming: N istek <-> N cevap
+}
+
+// Alan numaraları (= 1, = 2): Protobuf binary formatta alan adı yerine bu numaraları kullanır
+message UserRequest   { string name = 1; int32 count = 2; }
+message UserResponse  { string message = 1; }
+message NumberRequest { int32 value = 1; }
+message SumResponse   { int32 total = 1; }
+message ChatMessage   { string user = 1; string text = 2; }
+```
+
+Dört tipi ayıran tek şey `stream` kelimesinin yeridir. `.proto` dosyasının dilden bağımsız tanım (IDL) olması da burada görülüyor, içinde C# ya da başka bir programlama dili yok.
+
+
+### Sunucu: `DemoService.cs`
+
+```csharp
+using Grpc.Core;
+namespace GrpcDemo;
+
+// Demo.DemoBase: protoc'un .proto dosyasından ürettiği sınıf.
+// Biz sadece iş mantığını (implementasyonu) yazıyoruz.
+public class DemoService : Demo.DemoBase
+{
+    // UNARY: en basit RPC türü, tek istek tek cevap
+    // ServerCallContext: meta veriler, deadline ve cancellation bilgisi burada taşınır (bu örnekte kullanmadık)
+    public override Task<UserResponse> Unary(UserRequest request, ServerCallContext context)
+    {
+        var response = new UserResponse { Message = $"Merhaba {request.Name}" };
+        return Task.FromResult(response);
+    }
+
+
+    // SERVER STREAMING: 1 istek -> N cevap
+    // responseStream: sunucunun istemciye mesaj yazdığı kanal
+    public override async Task ServerStream(UserRequest request, IServerStreamWriter<UserResponse> responseStream, ServerCallContext context)
+    {
+        for(int k = 1; k <= request.Count; k++){
+            await responseStream.WriteAsync(
+                new UserResponse {Message = $"{request.Name} - mesaj {k}" });
+
+            await Task.Delay(500);   // akışı gözle görebilmek için
+        }
+    }
+
+
+    // CLIENT STREAMING: N istek -> 1 cevap
+    // requestStream: istemci mesaj gönderdikçe buraya düşer, End Streaming ile döngü biter
+    public override async Task<SumResponse> ClientStream(IAsyncStreamReader<NumberRequest> requestStream, ServerCallContext context)
+    {
+        int total = 0;
+        await foreach (var _number in requestStream.ReadAllAsync()){
+            total += _number.Value;
+        }
+
+        return new SumResponse{Total= total};
+    }
+
+
+    // BIDIRECTIONAL: N istek <-> N cevap
+    // Okuma (requestStream) ve yazma (responseStream) aynı anda açık, iki taraf birbirini beklemeden mesaj gönderebilir
+    public override async Task BidiStream(IAsyncStreamReader<ChatMessage> requestStream, IServerStreamWriter<ChatMessage> responseStream, ServerCallContext context)
+    {
+        await foreach ( var _msg in requestStream.ReadAllAsync()){
+            await responseStream.WriteAsync(
+                new ChatMessage {User = "Sunucu", Text = $"Echo: {_msg.Text}"}
+            );
+        }
+    }
+}
+```
+
+### Servis Kaydı: `Program.cs`
+
+```csharp
+using GrpcDemo;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddGrpc();              // gRPC altyapısı (HTTP/2 üzerinde çalışır)
+builder.Services.AddGrpcReflection();    // Postman'in metotları keşfetmesi için
+
+var app = builder.Build();
+
+app.MapGrpcService<DemoService>();       // gelen gRPC çağrılarını DemoService'e yönlendirir
+app.MapGrpcReflectionService();          // reflection uç noktası
+
+app.Run();
+```
+
+### Çalıştırma ve Postman ile Test
+```bash
+dotnet run --urls http://localhost:5001
+```
+![Postman gRPC istek oluşturma](Images/Postman%20gRPC%20istek%20oluşturma.jpg)
+
+gRPC'yi tarayıcı doğrudan konuşamadığı için adresi tarayıcıdan açıp deneyemeyiz. Postman'de yeni bir gRPC isteği açıp adrese `localhost:5001` yazıyoruz (TLS kapalı) ve **Use server reflection** seçiyoruz. Dört metot otomatik listelenir.
+
+![grpc method types](Images/grpc-method-types.png)
+
+> Postman'in web sürümünde gRPC isteklerinin `localhost`'a ulaşabilmesi için **Postman Desktop Agent**'ın çalışıyor olması gerekir.
+
+
+| Metot | Mesaj | Sonuç |
+|---|---|---|
+| `Unary` | `{"name":"Betul","count":0}` → **Invoke** | `Merhaba Betul` |
+| `ServerStream` | `{"name":"Betul","count":5}` → **Invoke** | 5 cevap, yarım saniye arayla |
+| `ClientStream` | **Invoke**, sonra `{"value":5}` ve `{"value":10}` için **Send**, en son **End Streaming** | `{"total":15}` |
+| `BidiStream` | **Invoke**, sonra `{"user":"Betul","text":"merhaba"}` için **Send** | Her mesaja anında `Echo: merhaba` |
+
+**Unary**
+
+![Unary](Images/Unary.png)
+
+**ServerStream**
+
+![ServerStream](Images/ServerStream.png)
+
+**ClientStream**
+
+![ClientStream](Images/ClientStream.png)
+
+**BidiStream**
+
+![BidiStream](Images/BidiStream.png)
+
 ---
 
 ## gRPC ve REST Karşılaştırması
 
 Önceki yazılarda [REST mimarisinden](https://github.com/BetulBilecen/TUG/blob/main/REST-API-ve-HTTP.md) bahsetmiştik. Şimdi ağda veri iletişimi için kullanılan bu iki mimariyi karşılaştıralım.
 
+![gRPC vs REST](Images/gRPC%20vs%20REST.jpg)
+
 Kısaca hem gRPC hem de REST, API tasarımında yaygın olarak kullanılan mimari stillerdir. Her ikisi de istemci/sunucu mimarisini takip eder, HTTP tabanlı iletişime dayanır ve programlama dillerinden bağımsızdır.
 
 REST ve gRPC mimarilerinin temel farklarını şöyle sıralayabiliriz:
 
-- **Veri Formatı:** REST API'leri JSON ve XML gibi düz metin formatlarını kullanır. gRPC ise verileri ikili (binary) formata dönüştürüp kodlamak için Protobuf kullanır. Binary formatı sayesinde karakter çözümlemeyle uğraşmadan, Server Stub gelen veriyi çok daha hızlı bir şekilde decode eder (anlaşılır nesnelere geri dönüştürür).
+- **Veri Formatı:** REST API'leri JSON ve XML gibi düz metin formatlarını kullanır. gRPC ise verileri ikili (binary) formata dönüştürüp kodlamak için Protobuf kullanır. Binary format sayesinde karakter çözümlemeyle uğraşmadan, Server Stub gelen veriyi çok daha hızlı bir şekilde decode eder (anlaşılır nesnelere geri dönüştürür).
 - **İletişim Modeli:** gRPC; Unary, Server Streaming, Client Streaming ve Bi-directional Streaming olmak üzere 4 farklı iletişim modelini destekler. REST mimarisi ise temelde tek yönlü istek-yanıt (Unary) mekanizmasını benimser.
 - **Kod Üretimi:** gRPC yerleşik kod üretimi sunar; `.proto` sözleşmesinden hem istemci hem sunucu iskelet kodları otomatik üretilir. REST'te bu özellik varsayılan olarak yoktur; ancak bu ihtiyacı karşılamak için harici araçlar (OpenAPI Generator, Swagger Codegen vb.) kullanılır.
 - **Tasarım Modeli:** gRPC, işlemlerin servis ve fonksiyon olarak tanımlandığı servis/eylem odaklı bir yapıya sahiptir. REST'te ise tasarım; URL'ler ile tanımlanan kaynaklar (resources) ve bunlara uygulanan standart HTTP metotları (GET, POST vb.) etrafında şekillenir.
 - **Bağlaşım (Coupling):** gRPC, ortak `.proto` sözleşmesine dayandığı için istemci ve sunucu arasında sıkı sıkıya bağlıdır (tight coupling); köklü şema değişikliklerinde iki tarafın da güncellenmesini gerektirir ancak derleme anında (compile-time) güçlü tip güvenliği sunar. REST ise gevşek bağlıdır (loose coupling); iletişim esnek JSON formatı ve evrensel HTTP fiilleri üzerinden yürür. Sunucunun yanıtına yeni bir alan eklenmesi veya iç mantığının değişmesi istemciyi etkilemez; istemci sadece ilgilendiği veriyi okumaya devam eder. Bu sayede ekipler birbirinin kodunu beklemeden büyük ölçüde bağımsız geliştirme yapabilir.
 - **Protokol ve Tarayıcı Desteği:** gRPC varsayılan olarak HTTP/2 kullanırken, REST API'leri genellikle HTTP/1.1 (veya isteğe bağlı HTTP/2) üzerinden çalışır. Modern tarayıcılar HTTP/2'yi desteklese de, tarayıcı API'leri (`fetch`, `XHR`) gRPC'nin ihtiyaç duyduğu alt düzey HTTP/2 özelliklerine doğrudan erişim izni vermez. Bu nedenle gRPC, web tarayıcılarında doğrudan çalışmak için ek bir köprüye (`gRPC-Web` ve Envoy proxy) ihtiyaç duyar; bu durum gRPC'yi web ön yüzleri yerine doğrudan arka uç (backend-to-backend) mikroservis iletişimi için çok daha cazip kılar.
+- **Cancellation:** Klasik REST/HTTP mimarisinde client bir istek attıktan sonra tarayıcıyı kapatsa veya internet bağlantısı kopsa bile server, bu durumdan haberdar olmayarak işlemi çalıştırmaya devam edebilir. gRPC'deki Cancellation özelliği ise devam eden bir RPC isteğinin iptal edilmesini sağlar. Böylece artık ihtiyaç duyulmayan işlemlerin durdurulmasına ve gereksiz kaynak tüketiminin önlenmesine yardımcı olur.
 
 ### Peki Madem gRPC Bu Kadar Güçlü, Neden Hâlâ REST Kullanıyoruz?
 
@@ -166,6 +361,7 @@ Madem performans ve hız tarafında bu kadar belirgin farklar var, neden tüm si
 - **Web Ön Yüzleri ve Tarayıcılar:** Ekstra bir vekil sunucuya (proxy) ihtiyaç duymadan doğrudan tarayıcıdan (`fetch`/`axios`) çağrılabilen sistemler.
 - **Halka Açık (Public) API'ler:** Dış dünyadaki üçüncü taraf geliştiricilerin kolayca anlayıp test edebileceği, entegrasyonu zahmetsiz genel servisler.
 - **Standart CRUD İşlemleri:** Karmaşık veri akışlarına ihtiyaç duymayan, basit veri alışverişi gerektiren uygulamalar.
+
 
 ---
 
